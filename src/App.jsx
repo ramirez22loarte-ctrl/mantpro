@@ -494,16 +494,8 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
   useEffect(() => {
     const loadParams = async () => {
       let p = await db.getParams(ot.id);
-      // Check if existing params match discipline - if not, delete and recreate
-      if (p && p.length > 0) {
-        const expectedNames = (DEFAULT_PARAMS[ot.discipline] || []).map(d => d.name);
-        const hasCorrectParams = p.some(param => expectedNames.includes(param.name));
-        if (!hasCorrectParams) {
-          // Wrong discipline params - delete and recreate
-          await supabase.from("parameters").delete().eq("ot_id", ot.id);
-          p = [];
-        }
-      }
+      // NEVER delete existing params - they may have readings linked to them
+      // Only create if there are no params at all
       if (!p || p.length === 0) {
         const disc = ot.discipline;
         const defaults = (DEFAULT_PARAMS[disc] || []).map((dp, i) => ({
@@ -511,7 +503,7 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
         }));
         if (defaults.length) {
           const { data } = await supabase.from("parameters").insert(defaults).select();
-          p = data || defaults.map((d, i) => ({ ...d, id: i + 1 }));
+          p = data || [];
         }
       }
       setParams(p || []);
@@ -573,25 +565,34 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
 
   const closeAndExport = async () => {
     setSaving(true);
-    // 1. Guardar parámetros y comentario pendientes
-    await autoSaveParams();
-    await autoSaveComment();
-
-    // 2. Cerrar OT
+    // 1. Guardar parámetros pendientes
+    const entries = Object.entries(vals).filter(([, v]) => v && v.trim());
+    for (const [pid, val] of entries) {
+      await db.addReading({ parameter_id: parseInt(pid), ot_id: ot.id, value: val, recorded_by: user.id });
+    }
+    setVals({});
+    // 2. Guardar comentario pendiente
+    if (comment.trim()) {
+      await db.addComment({ ot_id: ot.id, user_id: user.id, text: comment });
+      setComment("");
+    }
+    // 3. Cerrar OT
     await changeStatus("Cerrada");
 
-    // 3. Obtener todos los datos actualizados
+    // 4. Obtener todos los datos ACTUALIZADOS de Supabase
     const allR = await db.getReadings(ot.id);
     const allC = await db.getComments(ot.id);
+    // Re-fetch params to get current IDs
+    const allP = await db.getParams(ot.id);
 
     const printWindow = window.open("", "_blank");
-    const paramRows = params.map(p => {
+    const paramRows = allP.map(p => {
       const rs = allR.filter(r => r.parameter_id === p.id);
       const lastR = rs[rs.length - 1];
       return "<tr><td style='padding:8px 12px;border-bottom:1px solid #eee;font-weight:500'>" + p.name + " (" + p.unit + ")</td><td style='padding:8px 12px;border-bottom:1px solid #eee;color:" + (lastR ? "#065f46" : "#999") + ";font-weight:700'>" + (lastR ? lastR.value + " " + p.unit : "Sin datos") + "</td><td style='padding:8px 12px;border-bottom:1px solid #eee;color:#666;font-size:11px'>" + (lastR ? new Date(lastR.created_at).toLocaleString("es-CO") : "—") + "</td></tr>";
     }).join("");
 
-    const commentRows = allC.map(c => "<tr><td style='padding:8px 12px;border-bottom:1px solid #eee;color:#666;font-size:11px'>" + new Date(c.created_at).toLocaleString("es-CO") + "</td><td style='padding:8px 12px;border-bottom:1px solid #eee'>" + c.text + "</td></tr>").join("");
+    const commentRows = allC.length > 0 ? allC.map(c => "<tr><td style='padding:8px 12px;border-bottom:1px solid #eee;color:#666;font-size:11px'>" + (c.created_at ? new Date(c.created_at).toLocaleString("es-CO") : "—") + "</td><td style='padding:8px 12px;border-bottom:1px solid #eee'>" + (c.text || "") + "</td></tr>").join("") : "";
 
     printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>OT ${ot.id}</title><style>
       body{font-family:Arial,sans-serif;margin:30px;color:#111}
@@ -1206,6 +1207,15 @@ export default function App() {
 
   const closeModal = () => { setModal(null); setSelOT(null); };
 
+  // Refresh readings when navigating to verification page
+  const handlePageChange = async (p) => {
+    setPage(p);
+    if (p === "verificacion") {
+      const fresh = await db.getAllReadings();
+      setAllReadings(fresh);
+    }
+  };
+
   if (!user) return <Login onLogin={u => { setUser(u); }} />;
 
   const ADMIN_NAV = [
@@ -1238,7 +1248,7 @@ export default function App() {
         </div>
         <nav style={{ padding: "10px 6px", flex: 1, display: "flex", flexDirection: "column", gap: 2, overflowY: "auto" }}>
           {NAV.map(n => (
-            <div key={n.k} className={`nav${page === n.k ? " on" : ""}`} onClick={() => setPage(n.k)}>
+            <div key={n.k} className={`nav${page === n.k ? " on" : ""}`} onClick={() => handlePageChange(n.k)}>
               <span style={{ fontSize: 15, flexShrink: 0 }}>{n.i}</span>
               {sideOpen && <span>{n.l}</span>}
             </div>
