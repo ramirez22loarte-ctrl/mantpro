@@ -205,7 +205,8 @@ function ExcelImport({ onClose, onImported }) {
     setLoading(true);
     setStatus("Leyendo Excel...");
     const buf = await f.arrayBuffer();
-    const XLSX = await import("https://cdn.sheetjs.com/xlsx-0.20.2/package/xlsx.mjs");
+    const XLSX = window.XLSX;
+    if (!XLSX) { setStatus("⚠️ Error: librería Excel no cargada."); setLoading(false); return; }
     const wb = XLSX.read(buf, { type: "array" });
     const ws = wb.Sheets[wb.SheetNames[0]];
 
@@ -889,7 +890,10 @@ function NewEquip({ locations, onClose, onSave }) {
             <Lbl l="Área"><input className="inp" placeholder="Área" value={f.area} onChange={e => s("area", e.target.value)} /></Lbl>
             <Lbl l="Sub-área"><input className="inp" placeholder="Sub-área" value={f.subarea} onChange={e => s("subarea", e.target.value)} /></Lbl>
           </div>
-          <Lbl l="Disciplina"><select className="inp" value={f.discipline} onChange={e => s("discipline", e.target.value)}>{DISCIPLINES.map(d => <option key={d}>{d}</option>)}</select></Lbl>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <Lbl l="Disciplina"><select className="inp" value={f.discipline} onChange={e => s("discipline", e.target.value)}>{DISCIPLINES.map(d => <option key={d}>{d}</option>)}</select></Lbl>
+            <Lbl l="Estado"><select className="inp" value={f.status} onChange={e => s("status", e.target.value)}><option>Operativo</option><option>En mantenimiento</option><option>Fuera de servicio</option></select></Lbl>
+          </div>
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 }}>
             <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "8px 16px", fontSize: 13 }}>Cancelar</button>
             <button className="btn" onClick={submit} disabled={!f.code || saving} style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "8px 18px", fontSize: 13 }}>{saving ? "Guardando..." : "Guardar"}</button>
@@ -1029,6 +1033,7 @@ export default function App() {
     { k: "ji", i: "📖", l: "Job Instructions" },
     { k: "kpi", i: "📈", l: "Indicadores KPI" },
     { k: "dashboard_op", i: "📡", l: "Dashboard Operativo" },
+    { k: "verificacion", i: "✅", l: "Verificación" },
     { k: "users", i: "👥", l: "Usuarios" },
   ];
   const TECH_NAV = [
@@ -1216,6 +1221,55 @@ export default function App() {
           )}
 
           {page === "dashboard_op" && isAdmin && <DashboardOperativo allReadings={allReadings} />}
+
+          {page === "verificacion" && isAdmin && (
+            <div className="fd">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+                <div style={{ fontSize: 13, color: "#64748b" }}>
+                  {allReadings.length} lecturas registradas en total
+                </div>
+                <button className="btn" onClick={() => {
+                  const XLSX = window.XLSX;
+                  if (!XLSX) { alert("Error: librería Excel no cargada"); return; }
+                  const rows = allReadings.map(r => ({
+                    "N° OT": r.ot_id || "",
+                    "Disciplina": r.work_orders?.discipline || "",
+                    "Parámetro": r.parameters?.name || "",
+                    "Unidad": r.parameters?.unit || "",
+                    "Valor": r.value || "",
+                    "Fecha": r.created_at ? new Date(r.created_at).toLocaleString("es-CO") : "",
+                  }));
+                  const ws = XLSX.utils.json_to_sheet(rows);
+                  const wb = XLSX.utils.book_new();
+                  XLSX.utils.book_append_sheet(wb, ws, "Lecturas");
+                  XLSX.writeFile(wb, "verificacion_parametros_" + new Date().toLocaleDateString("es-CO").replace(/\//g, "-") + ".xlsx");
+                }} style={{ background: "linear-gradient(135deg,#065f46,#0f766e)", color: "#34d399", padding: "8px 18px", fontSize: 13 }}>
+                  📥 Descargar Excel
+                </button>
+              </div>
+              <div style={{ overflowX: "auto" }}>
+                <table className="ptable">
+                  <thead>
+                    <tr>
+                      {["N° OT","Disciplina","Parámetro","Unidad","Valor","Fecha"].map(h => <th key={h}>{h}</th>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allReadings.slice().reverse().map((r, i) => (
+                      <tr key={i}>
+                        <td style={{ color: "#3b82f6", fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 11 }}>{r.ot_id}</td>
+                        <td><span style={{ color: D_COLOR[r.work_orders?.discipline] || "#64748b", fontSize: 11 }}>{D_ICON[r.work_orders?.discipline] || ""} {r.work_orders?.discipline || "—"}</span></td>
+                        <td style={{ color: "#cbd5e1", fontSize: 12 }}>{r.parameters?.name || "—"}</td>
+                        <td style={{ color: "#64748b", fontSize: 11 }}>{r.parameters?.unit || "—"}</td>
+                        <td style={{ color: "#34d399", fontWeight: 700, fontSize: 13 }}>{r.value}</td>
+                        <td style={{ color: "#475569", fontSize: 11 }}>{r.created_at ? new Date(r.created_at).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" }) : "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {page === "users" && isAdmin && (
             <div className="fd" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))", gap: 12 }}>
