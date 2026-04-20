@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { supabase } from "./supabase.js";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from "recharts";
 
@@ -124,6 +124,21 @@ const db = {
   async addReading(r) { const { data } = await supabase.from("readings").insert(r).select().single(); return data; },
   async addComment(c) { const { data } = await supabase.from("comments").insert(c).select("*, users(name, role, discipline)").single(); return data; },
   async createUser(u) { const { data, error } = await supabase.from('users').insert(u).select().single(); return { data, error }; },
+  async createOTsBulk(ots, params) {
+    const results = [];
+    for (const ot of ots) {
+      try {
+        const { data: otData } = await supabase.from('work_orders').insert(ot).select().single();
+        if (otData) {
+          const disc = ot.discipline;
+          const defaultParams = (DEFAULT_PARAMS[disc] || []).map((p, i) => ({ ...p, ot_id: otData.id, expected: '', sort_order: i }));
+          if (defaultParams.length) await supabase.from('parameters').insert(defaultParams);
+          results.push({ ok: true, id: otData.id });
+        }
+      } catch(e) { results.push({ ok: false, id: ot.id, error: e.message }); }
+    }
+    return results;
+  },
 };
 
 // ── NEW USER MODAL ────────────────────────────────────────────
@@ -164,6 +179,258 @@ function NewUser({ onClose, onSave }) {
               {saving ? "Creando..." : "Crear Usuario"}
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// ── EXCEL IMPORT MODAL ───────────────────────────────────────
+function ExcelImport({ onClose, onImported }) {
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState("");
+  const [done, setDone] = useState(false);
+  const fileRef = useRef();
+
+  const DISC_MAP = {
+    "mecánico": "Mecánico", "mecanico": "Mecánico",
+    "electricidad": "Eléctrico", "eléctrico": "Eléctrico", "electrico": "Eléctrico", "elec": "Eléctrico",
+    "instrumentación": "Instrumentación", "instrumentacion": "Instrumentación", "inst": "Instrumentación",
+  };
+
+  const parseExcel = async (f) => {
+    setLoading(true);
+    setStatus("Leyendo Excel...");
+    const buf = await f.arrayBuffer();
+    const XLSX = await import("https://cdn.sheetjs.com/xlsx-0.20.2/package/xlsx.mjs");
+    const wb = XLSX.read(buf, { type: "array" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+
+    // Find header row - look for N° Orden de Trabajo column
+    const otRows = rows.filter(r => {
+      const vals = Object.values(r).map(v => String(v).toLowerCase());
+      return vals.some(v => v.match(/^\d{10}$/)); // SAP order number
+    });
+
+    // Map columns flexibly
+    const mapped = [];
+    const seen = new Set();
+    for (const row of rows) {
+      const keys = Object.keys(row);
+      // Find OT number - 10 digit number
+      let otNum = "";
+      let disc = "";
+      let tag = "";
+      let desc = "";
+
+      for (const k of keys) {
+        const val = String(row[k]).trim();
+        if (!otNum && /^\d{10}$/.test(val)) otNum = val;
+        const kl = k.toLowerCase();
+        if (!disc && (kl.includes("disciplina") || kl.includes("disc"))) {
+          disc = DISC_MAP[val.toLowerCase().trim()] || val;
+        }
+        if (!tag && (kl.includes("clasificaci") || kl.includes("campo") || kl.includes("tag"))) {
+          tag = val;
+        }
+        if (!desc && (kl.includes("descripci") && kl.includes("actividad") || kl.includes("texto breve"))) {
+          desc = val;
+        }
+      }
+
+      // Also try positional - N° OT is usually col 5 (index 4), Oper col 6, Disc col 7, Desc col 8
+      if (!otNum) {
+        for (const k of keys) {
+          const val = String(row[k]).trim();
+          if (/^\d{10}$/.test(val)) { otNum = val; break; }
+        }
+      }
+      if (!disc) {
+        const vals = Object.values(row).map(v => String(v).trim());
+        for (const v of vals) {
+          const mapped2 = DISC_MAP[v.toLowerCase()];
+          if (mapped2) { disc = mapped2; break; }
+        }
+      }
+      if (!tag) {
+        const vals = Object.entries(row);
+        for (const [k, v] of vals) {
+          if (String(v).includes(".") && String(v).length > 10 && !String(v).includes(" ")) {
+            tag = String(v); break;
+          }
+        }
+      }
+      if (!desc) {
+        const vals = Object.values(row).map(v => String(v).trim());
+        for (const v of vals) {
+          if (v.length > 10 && v.length < 200 && /[a-zA-Z]/.test(v) && !v.includes(".") ) {
+            desc = v; break;
+          }
+        }
+      }
+
+      const key = otNum + "|" + disc;
+      if (otNum && disc && !seen.has(key)) {
+        seen.add(key);
+        mapped.push({ otNum, disc: disc || "Mecánico", tag, desc });
+      }
+    }
+
+    setPreview(mapped.slice(0, 200));
+    setLoading(false);
+    setStatus(`Se encontraron ${mapped.length} órdenes de trabajo únicas.`);
+  };
+
+  const handleFile = async (f) => {
+    setFile(f);
+    setPreview([]);
+    setDone(false);
+    await parseExcel(f);
+  };
+
+  const importOTs = async () => {
+    if (!preview.length) return;
+    setLoading(true);
+    setStatus("Importando OTs...");
+    let ok = 0, fail = 0;
+    for (const row of preview) {
+      const id = row.otNum;
+      const ot = {
+        id,
+        title: row.desc || `OT ${id}`,
+        discipline: row.disc,
+        priority: "Media",
+        status: "Abierta",
+        description: row.desc || "",
+        asset: row.tag,
+        location: row.tag,
+        created_at: new Date().toISOString().split("T")[0],
+        equipment_id: null, location_id: null, assigned_to: null, job_instruction_id: null,
+      };
+      try {
+        const { data: otData } = await supabase.from("work_orders").insert(ot).select().single();
+        if (otData) {
+          const defaultParams = (DEFAULT_PARAMS[row.disc] || []).map((p, i) => ({
+            name: p.name, unit: p.unit, expected: "", ot_id: otData.id, sort_order: i
+          }));
+          if (defaultParams.length) await supabase.from("parameters").insert(defaultParams);
+          ok++;
+        }
+      } catch(e) { fail++; }
+      setStatus(`Importando... ${ok + fail}/${preview.length}`);
+    }
+    setLoading(false);
+    setDone(true);
+    setStatus(`✅ ${ok} OTs importadas correctamente. ${fail > 0 ? fail + " fallaron." : ""}`);
+    onImported();
+  };
+
+  return (
+    <div className="ov" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="mod fd" style={{ width: 700 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 18 }}>
+          <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 16, color: "#f1f5f9" }}>📥 Importar OTs desde Excel</div>
+          <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "5px 11px" }}>✕</button>
+        </div>
+
+        {/* Upload area */}
+        <div
+          onClick={() => fileRef.current?.click()}
+          onDragOver={e => e.preventDefault()}
+          onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
+          style={{ border: "2px dashed #1a2740", borderRadius: 10, padding: 28, textAlign: "center", cursor: "pointer", marginBottom: 16, background: "#060b14", transition: "border .2s" }}
+          onMouseEnter={e => e.currentTarget.style.borderColor = "#3b82f6"}
+          onMouseLeave={e => e.currentTarget.style.borderColor = "#1a2740"}
+        >
+          <div style={{ fontSize: 32, marginBottom: 8 }}>📊</div>
+          <div style={{ fontSize: 14, color: "#64748b" }}>
+            {file ? <span style={{ color: "#34d399", fontWeight: 600 }}>{file.name}</span> : "Arrastra tu Excel aquí o haz clic para seleccionar"}
+          </div>
+          <div style={{ fontSize: 11, color: "#334155", marginTop: 4 }}>Soporta .xlsx y .xls</div>
+          <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: "none" }}
+            onChange={e => { const f = e.target.files[0]; if (f) handleFile(f); }} />
+        </div>
+
+        {loading && <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, color: "#64748b", fontSize: 13 }}><Spinner /> {status}</div>}
+        {!loading && status && <div style={{ fontSize: 13, color: done ? "#34d399" : "#60a5fa", marginBottom: 12, padding: "8px 12px", background: "#060b14", borderRadius: 7 }}>{status}</div>}
+
+        {preview.length > 0 && !done && (
+          <div>
+            <div style={{ fontSize: 12, color: "#475569", marginBottom: 8 }}>Vista previa — primeras {Math.min(preview.length, 10)} OTs:</div>
+            <div style={{ overflowX: "auto", marginBottom: 14 }}>
+              <table className="ptable">
+                <thead><tr>{["N° OT","Disciplina","Tag Equipo","Descripción"].map(h => <th key={h}>{h}</th>)}</tr></thead>
+                <tbody>
+                  {preview.slice(0, 10).map((r, i) => (
+                    <tr key={i}>
+                      <td style={{ color: "#3b82f6", fontFamily: "Syne,sans-serif", fontSize: 11, fontWeight: 700 }}>{r.otNum}</td>
+                      <td><span style={{ color: D_COLOR[r.disc] }}>{D_ICON[r.disc]} {r.disc}</span></td>
+                      <td style={{ color: "#64748b", fontSize: 11 }}>{r.tag?.slice(0, 30)}</td>
+                      <td style={{ color: "#94a3b8", fontSize: 11 }}>{r.desc?.slice(0, 50)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "8px 16px", fontSize: 13 }}>Cancelar</button>
+              <button className="btn" onClick={importOTs} style={{ background: "linear-gradient(135deg,#065f46,#0f766e)", color: "#34d399", padding: "8px 20px", fontSize: 13 }}>
+                ⬆️ Importar {preview.length} OTs
+              </button>
+            </div>
+          </div>
+        )}
+        {done && <div style={{ display: "flex", justifyContent: "flex-end" }}><button className="btn" onClick={onClose} style={{ background: "#0f2040", color: "#60a5fa", padding: "8px 20px", fontSize: 13 }}>Cerrar</button></div>}
+      </div>
+    </div>
+  );
+}
+
+// ── TECH OT SEARCH ────────────────────────────────────────────
+function TechOTSearch({ user, onFound }) {
+  const [otNum, setOtNum] = useState("");
+  const [disc, setDisc] = useState(user.discipline || "Mecánico");
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+
+  const search = async () => {
+    if (!otNum.trim()) return;
+    setLoading(true); setErr("");
+    const { data } = await supabase.from("work_orders").select("*").eq("id", otNum.trim()).single();
+    if (data) onFound(data);
+    else setErr("No se encontró la OT. Verifica el número.");
+    setLoading(false);
+  };
+
+  return (
+    <div className="ov" onClick={e => e.target === e.currentTarget && null}>
+      <div className="mod fd" style={{ width: 420 }}>
+        <div style={{ textAlign: "center", marginBottom: 22 }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>🔍</div>
+          <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 17, color: "#f1f5f9" }}>Buscar Orden de Trabajo</div>
+          <div style={{ fontSize: 12, color: "#475569", marginTop: 4 }}>Ingresa el número de tu OT para acceder a los parámetros</div>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+          <Lbl l="N° Orden de Trabajo">
+            <input className="inp" placeholder="Ej: 2000194307" value={otNum}
+              onChange={e => setOtNum(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && search()}
+              style={{ fontFamily: "Syne,sans-serif", fontSize: 16, letterSpacing: "0.05em" }} />
+          </Lbl>
+          <Lbl l="Tu Disciplina">
+            <select className="inp" value={disc} onChange={e => setDisc(e.target.value)}>
+              {["Mecánico","Eléctrico","Instrumentación"].map(d => <option key={d}>{d}</option>)}
+            </select>
+          </Lbl>
+          {err && <div style={{ fontSize: 12, color: "#f87171", background: "#3b0f0f", padding: "8px 12px", borderRadius: 7 }}>{err}</div>}
+          <button className="btn" onClick={search} disabled={loading || !otNum.trim()}
+            style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "12px", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+            {loading ? <><Spinner /> Buscando...</> : "🔍 Buscar OT"}
+          </button>
         </div>
       </div>
     </div>
@@ -694,11 +961,15 @@ export default function App() {
         <div style={{ background: "#070e1b", borderBottom: "1px solid #111c30", padding: "12px 22px", display: "flex", alignItems: "center", gap: 10, position: "sticky", top: 0, zIndex: 10 }}>
           <div style={{ flex: 1, fontFamily: "Syne,sans-serif", fontSize: 16, fontWeight: 700, color: "#f1f5f9" }}>{curNav?.i} {curNav?.l}</div>
           {loading && <Spinner />}
-          {isAdmin && page === "ots" && <button className="btn" onClick={() => setModal("newOT")} style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "7px 16px", fontSize: 13 }}>+ Nueva OT</button>}
+          {isAdmin && page === "ots" && <>
+            <button className="btn" onClick={() => setModal("importExcel")} style={{ background: "#0f2040", color: "#34d399", padding: "7px 14px", fontSize: 13 }}>📥 Importar Excel</button>
+            <button className="btn" onClick={() => setModal("newOT")} style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "7px 16px", fontSize: 13 }}>+ Nueva OT</button>
+          </>}
           {isAdmin && page === "equipment" && <button className="btn" onClick={() => setModal("newEquip")} style={{ background: "#0f2040", color: "#60a5fa", padding: "7px 14px", fontSize: 13 }}>+ Equipo</button>}
           {isAdmin && page === "locations" && <button className="btn" onClick={() => setModal("newLoc")} style={{ background: "#0f2040", color: "#60a5fa", padding: "7px 14px", fontSize: 13 }}>+ Ubicación</button>}
           {isAdmin && page === "ji" && <button className="btn" onClick={() => setModal("newJI")} style={{ background: "#0f2040", color: "#60a5fa", padding: "7px 14px", fontSize: 13 }}>+ Instrucción</button>}
           {isAdmin && page === "users" && <button className="btn" onClick={() => setModal("newUser")} style={{ background: "#0f2040", color: "#60a5fa", padding: "7px 14px", fontSize: 13 }}>+ Usuario</button>}
+          {!isAdmin && <button className="btn" onClick={() => setModal("searchOT")} style={{ background: "linear-gradient(135deg,#065f46,#0f766e)", color: "#34d399", padding: "7px 16px", fontSize: 13 }}>🔍 Buscar OT</button>}
         </div>
 
         <div style={{ padding: 20, flex: 1 }}>
@@ -865,6 +1136,8 @@ export default function App() {
       {modal === "newLoc" && <NewLoc onClose={closeModal} onSave={loc => { setLocations(p => [...p, loc]); closeModal(); }} />}
       {modal === "newJI" && <NewJI onClose={closeModal} onSave={ji => { setJis(p => [...p, ji]); closeModal(); }} />}
       {modal === "newUser" && <NewUser onClose={closeModal} onSave={u => { setUsers(p => [...p, u]); closeModal(); }} />}
+      {modal === "importExcel" && <ExcelImport onClose={closeModal} onImported={async () => { const data = await db.getOTs(user.id, isAdmin); setOts(data); }} />}
+      {modal === "searchOT" && <TechOTSearch user={user} onFound={ot => { setSelOT(ot); setModal("otDetail"); }} />}
     </div>
   );
 }
