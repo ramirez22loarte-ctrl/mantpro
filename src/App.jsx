@@ -107,7 +107,7 @@ const db = {
     return data || [];
   },
   async getParams(otId) { const { data } = await supabase.from("parameters").select("*").eq("ot_id", otId).order("sort_order"); return data || []; },
-  async getReadings(otId) { const { data } = await supabase.from("readings").select("*").eq("ot_id", otId).order("created_at"); return data || []; },
+  async getReadings(otId) { const { data } = await supabase.from("readings").select("*, parameters(name, unit)").eq("ot_id", otId).order("created_at"); return data || []; },
   async getComments(otId) { const { data } = await supabase.from("comments").select("*, users(name, role, discipline)").eq("ot_id", otId).order("created_at"); return data || []; },
   async getAllReadings() { const { data } = await supabase.from("readings").select("*, parameters(name, unit), work_orders(discipline)").order("created_at"); return data || []; },
   async createLocation(loc) { const { data } = await supabase.from("locations").insert(loc).select().single(); return data; },
@@ -492,8 +492,17 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
   useEffect(() => {
     const loadParams = async () => {
       let p = await db.getParams(ot.id);
+      // Check if existing params match discipline - if not, delete and recreate
+      if (p && p.length > 0) {
+        const expectedNames = (DEFAULT_PARAMS[ot.discipline] || []).map(d => d.name);
+        const hasCorrectParams = p.some(param => expectedNames.includes(param.name));
+        if (!hasCorrectParams) {
+          // Wrong discipline params - delete and recreate
+          await supabase.from("parameters").delete().eq("ot_id", ot.id);
+          p = [];
+        }
+      }
       if (!p || p.length === 0) {
-        // No params in DB — create them from DEFAULT_PARAMS based on discipline
         const disc = ot.discipline;
         const defaults = (DEFAULT_PARAMS[disc] || []).map((dp, i) => ({
           name: dp.name, unit: dp.unit, expected: "", ot_id: ot.id, sort_order: i
@@ -503,7 +512,7 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
           p = data || defaults.map((d, i) => ({ ...d, id: i + 1 }));
         }
       }
-      setParams(p);
+      setParams(p || []);
     };
     loadParams();
     db.getReadings(ot.id).then(setReadings);
@@ -513,6 +522,10 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
   const lastReading = (paramId) => {
     const r = readings.filter(r => r.parameter_id === paramId);
     return r[r.length - 1];
+  };
+
+  const allReadingsForParam = (paramId) => {
+    return readings.filter(r => r.parameter_id === paramId);
   };
 
   const saveAll = async () => {
@@ -572,10 +585,21 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
               <div style={{ fontSize: 12, color: D_COLOR[ot.discipline], fontWeight: 600 }}>
                 {D_ICON[ot.discipline]} Parámetros {ot.discipline} — {params.length} campos
               </div>
-              <button className="btn" onClick={saveAll} disabled={saving || Object.values(vals).every(v => !v?.trim())}
-                style={{ background: "linear-gradient(135deg,#065f46,#0f766e)", color: "#34d399", padding: "7px 16px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
-                {saving ? <><Spinner /> Guardando...</> : "💾 Guardar Todo"}
-              </button>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button className="btn" onClick={saveAll} disabled={saving || Object.values(vals).every(v => !v?.trim())}
+                  style={{ background: "linear-gradient(135deg,#065f46,#0f766e)", color: "#34d399", padding: "7px 16px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+                  {saving ? <><Spinner /> Guardando...</> : "💾 Guardar Todo"}
+                </button>
+                {status !== "Cerrada" && (
+                  <button className="btn" onClick={async () => { await changeStatus("Cerrada"); }}
+                    style={{ background: "#2a1e3a", color: "#a78bfa", padding: "7px 14px", fontSize: 13, border: "1px solid #8b5cf6" }}>
+                    ✅ Cerrar OT
+                  </button>
+                )}
+                {status === "Cerrada" && (
+                  <span style={{ fontSize: 12, color: "#a78bfa", alignSelf: "center", padding: "0 8px" }}>✅ OT Cerrada</span>
+                )}
+              </div>
             </div>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -602,10 +626,14 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
                           <span style={{ color: "#475569", fontSize: 11, marginLeft: 6 }}>({p.unit})</span>
                         </td>
                         <td style={{ padding: "11px 14px" }}>
-                          {last ? (
-                            <div>
-                              <span style={{ color: "#34d399", fontWeight: 700 }}>{last.value}</span>
-                              <span style={{ color: "#334155", fontSize: 10, marginLeft: 5 }}>{new Date(last.created_at).toLocaleDateString("es-CO")}</span>
+                          {allReadingsForParam(p.id).length > 0 ? (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                              {allReadingsForParam(p.id).map((r, ri) => (
+                                <div key={ri}>
+                                  <span style={{ color: "#34d399", fontWeight: 700 }}>{r.value} {p.unit}</span>
+                                  <span style={{ color: "#334155", fontSize: 10, marginLeft: 5 }}>{new Date(r.created_at).toLocaleDateString("es-CO")}</span>
+                                </div>
+                              ))}
                             </div>
                           ) : <span style={{ color: "#334155", fontSize: 11 }}>Sin datos</span>}
                         </td>
