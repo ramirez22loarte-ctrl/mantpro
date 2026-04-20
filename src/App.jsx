@@ -123,7 +123,52 @@ const db = {
   async updateOTStatus(id, status) { await supabase.from("work_orders").update({ status }).eq("id", id); },
   async addReading(r) { const { data } = await supabase.from("readings").insert(r).select().single(); return data; },
   async addComment(c) { const { data } = await supabase.from("comments").insert(c).select("*, users(name, role, discipline)").single(); return data; },
+  async createUser(u) { const { data, error } = await supabase.from('users').insert(u).select().single(); return { data, error }; },
 };
+
+// ── NEW USER MODAL ────────────────────────────────────────────
+function NewUser({ onClose, onSave }) {
+  const [f, setF] = useState({ name: "", email: "", password: "", role: "tecnico", discipline: "Mecánico" });
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+  const s = (k, v) => setF(p => ({ ...p, [k]: v }));
+
+  const submit = async () => {
+    if (!f.name || !f.email || !f.password) { setErr("Nombre, email y contraseña son obligatorios."); return; }
+    setSaving(true); setErr("");
+    const { data, error } = await db.createUser({ ...f, discipline: f.role === "admin" ? null : f.discipline });
+    if (error) { setErr("Error: email ya existe o datos inválidos."); setSaving(false); return; }
+    onSave(data);
+    setSaving(false);
+  };
+
+  return (
+    <div className="ov" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="mod fd" style={{ width: 420 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 18 }}>
+          <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 16, color: "#f1f5f9" }}>👤 Nuevo Usuario</div>
+          <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "5px 11px" }}>✕</button>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+          <Lbl l="Nombre completo *"><input className="inp" placeholder="Juan Pérez" value={f.name} onChange={e => s("name", e.target.value)} /></Lbl>
+          <Lbl l="Email *"><input className="inp" placeholder="usuario@empresa.com" value={f.email} onChange={e => s("email", e.target.value)} /></Lbl>
+          <Lbl l="Contraseña *"><input className="inp" type="password" placeholder="Contraseña" value={f.password} onChange={e => s("password", e.target.value)} /></Lbl>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <Lbl l="Rol"><select className="inp" value={f.role} onChange={e => s("role", e.target.value)}><option value="tecnico">Técnico</option><option value="admin">Administrador</option></select></Lbl>
+            {f.role === "tecnico" && <Lbl l="Disciplina"><select className="inp" value={f.discipline} onChange={e => s("discipline", e.target.value)}>{["Mecánico","Eléctrico","Instrumentación"].map(d => <option key={d}>{d}</option>)}</select></Lbl>}
+          </div>
+          {err && <div style={{ fontSize: 12, color: "#f87171", background: "#3b0f0f", padding: "8px 12px", borderRadius: 7 }}>{err}</div>}
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 }}>
+            <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "8px 16px", fontSize: 13 }}>Cancelar</button>
+            <button className="btn" onClick={submit} disabled={saving} style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "8px 20px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+              {saving ? "Creando..." : "Crear Usuario"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── LOGIN ─────────────────────────────────────────────────────
 function Login({ onLogin }) {
@@ -648,6 +693,7 @@ export default function App() {
           {isAdmin && page === "equipment" && <button className="btn" onClick={() => setModal("newEquip")} style={{ background: "#0f2040", color: "#60a5fa", padding: "7px 14px", fontSize: 13 }}>+ Equipo</button>}
           {isAdmin && page === "locations" && <button className="btn" onClick={() => setModal("newLoc")} style={{ background: "#0f2040", color: "#60a5fa", padding: "7px 14px", fontSize: 13 }}>+ Ubicación</button>}
           {isAdmin && page === "ji" && <button className="btn" onClick={() => setModal("newJI")} style={{ background: "#0f2040", color: "#60a5fa", padding: "7px 14px", fontSize: 13 }}>+ Instrucción</button>}
+          {isAdmin && page === "users" && <button className="btn" onClick={() => setModal("newUser")} style={{ background: "#0f2040", color: "#60a5fa", padding: "7px 14px", fontSize: 13 }}>+ Usuario</button>}
         </div>
 
         <div style={{ padding: 20, flex: 1 }}>
@@ -813,6 +859,7 @@ export default function App() {
       {modal === "newEquip" && <NewEquip locations={locations} onClose={closeModal} onSave={eq => { setEquipment(p => [...p, eq]); closeModal(); }} />}
       {modal === "newLoc" && <NewLoc onClose={closeModal} onSave={loc => { setLocations(p => [...p, loc]); closeModal(); }} />}
       {modal === "newJI" && <NewJI onClose={closeModal} onSave={ji => { setJis(p => [...p, ji]); closeModal(); }} />}
+      {modal === "newUser" && <NewUser onClose={closeModal} onSave={u => { setUsers(p => [...p, u]); closeModal(); }} />}
     </div>
   );
 }
