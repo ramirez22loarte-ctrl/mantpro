@@ -1050,13 +1050,80 @@ function ParamChart({ paramName, unit, color, allReadings }) {
   );
 }
 
-function DashboardOperativo({ allReadings }) {
-  const total = allReadings.length;
-  const mec = allReadings.filter(r => r.work_orders && r.work_orders.discipline === "Mecánico").length;
-  const elec = allReadings.filter(r => r.work_orders && r.work_orders.discipline === "Eléctrico").length;
-  const inst = allReadings.filter(r => r.work_orders && r.work_orders.discipline === "Instrumentación").length;
+function DashboardOperativo({ allReadings, equipment }) {
+  const [filterFecha, setFilterFecha] = useState("");
+  const [filterTag, setFilterTag] = useState("");
+  const [filterArea, setFilterArea] = useState("");
+
+  // Build filter options from data
+  const fechas = [...new Set(allReadings.map(r => r.created_at ? new Date(r.created_at).toLocaleDateString("es-CO") : "").filter(Boolean))].sort().reverse();
+  const tags = [...new Set(equipment.map(e => e.code).filter(Boolean))].sort();
+  const areas = [...new Set(equipment.map(e => e.area).filter(Boolean))].sort();
+
+  // Filter readings
+  const filtered = allReadings.filter(r => {
+    const fecha = r.created_at ? new Date(r.created_at).toLocaleDateString("es-CO") : "";
+    const otTag = r.work_orders?.title || "";
+    const eq = equipment.find(e => r.work_orders?.title?.includes(e.code) || r.ot_id?.includes(e.code));
+    const eqArea = eq?.area || "";
+    if (filterFecha && fecha !== filterFecha) return false;
+    if (filterTag && !(otTag.includes(filterTag) || r.ot_id?.includes(filterTag))) return false;
+    if (filterArea && eqArea !== filterArea) return false;
+    return true;
+  });
+
+  const total = filtered.length;
+  const mec = filtered.filter(r => r.work_orders && r.work_orders.discipline === "Mecánico").length;
+  const elec = filtered.filter(r => r.work_orders && r.work_orders.discipline === "Eléctrico").length;
+  const inst = filtered.filter(r => r.work_orders && r.work_orders.discipline === "Instrumentación").length;
+
+  const clearFilters = () => { setFilterFecha(""); setFilterTag(""); setFilterArea(""); };
+  const hasFilters = filterFecha || filterTag || filterArea;
+
   return (
     <div className="fd">
+      {/* FILTROS */}
+      <div className="card" style={{ marginBottom: 18, padding: "14px 18px" }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 12 }}>🔽 Filtros</div>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
+          <div style={{ flex: 1, minWidth: 160 }}>
+            <div style={{ fontSize: 10, color: "#475569", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>Fecha de Cierre</div>
+            <select className="inp" value={filterFecha} onChange={e => setFilterFecha(e.target.value)}>
+              <option value="">Todas las fechas</option>
+              {fechas.map(f => <option key={f} value={f}>{f}</option>)}
+            </select>
+          </div>
+          <div style={{ flex: 1, minWidth: 160 }}>
+            <div style={{ fontSize: 10, color: "#475569", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>TAG / Equipo</div>
+            <select className="inp" value={filterTag} onChange={e => setFilterTag(e.target.value)}>
+              <option value="">Todos los TAGs</option>
+              {tags.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+          <div style={{ flex: 1, minWidth: 160 }}>
+            <div style={{ fontSize: 10, color: "#475569", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>Área</div>
+            <select className="inp" value={filterArea} onChange={e => setFilterArea(e.target.value)}>
+              <option value="">Todas las áreas</option>
+              {areas.map(a => <option key={a} value={a}>{a}</option>)}
+            </select>
+          </div>
+          {hasFilters && (
+            <button className="btn" onClick={clearFilters} style={{ background: "#3b0f0f", color: "#f87171", padding: "8px 14px", fontSize: 12 }}>
+              ✕ Limpiar filtros
+            </button>
+          )}
+        </div>
+        {hasFilters && (
+          <div style={{ marginTop: 10, fontSize: 12, color: "#60a5fa" }}>
+            Mostrando {filtered.length} de {allReadings.length} lecturas
+            {filterFecha && <span style={{ marginLeft: 8, background: "#0f2040", padding: "2px 8px", borderRadius: 99, fontSize: 11 }}>📅 {filterFecha}</span>}
+            {filterTag && <span style={{ marginLeft: 8, background: "#0f2040", padding: "2px 8px", borderRadius: 99, fontSize: 11 }}>🏷️ {filterTag}</span>}
+            {filterArea && <span style={{ marginLeft: 8, background: "#0f2040", padding: "2px 8px", borderRadius: 99, fontSize: 11 }}>📍 {filterArea}</span>}
+          </div>
+        )}
+      </div>
+
+      {/* KPIs */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 10, marginBottom: 20 }}>
         {[
           { l: "Total Lecturas", v: total, c: "#3b82f6", i: "📊" },
@@ -1071,23 +1138,24 @@ function DashboardOperativo({ allReadings }) {
           </div>
         ))}
       </div>
+
       <div style={{ fontSize: 11, fontWeight: 600, color: "#f97316", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
         ⚙️ Parámetros Mecánicos <div style={{ flex: 1, height: 1, background: "#1a2740" }} />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 12, marginBottom: 20 }}>
-        {MEC_PARAMS.map(p => <ParamChart key={p.name} paramName={p.name} unit={p.unit} color={p.color} allReadings={allReadings} />)}
+        {MEC_PARAMS.map(p => <ParamChart key={p.name} paramName={p.name} unit={p.unit} color={p.color} allReadings={filtered} />)}
       </div>
       <div style={{ fontSize: 11, fontWeight: 600, color: "#facc15", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
         ⚡ Parámetros Eléctricos <div style={{ flex: 1, height: 1, background: "#1a2740" }} />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 12, marginBottom: 20 }}>
-        {ELEC_PARAMS.map(p => <ParamChart key={p.name} paramName={p.name} unit={p.unit} color={p.color} allReadings={allReadings} />)}
+        {ELEC_PARAMS.map(p => <ParamChart key={p.name} paramName={p.name} unit={p.unit} color={p.color} allReadings={filtered} />)}
       </div>
       <div style={{ fontSize: 11, fontWeight: 600, color: "#22d3ee", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
         📡 Instrumentación <div style={{ flex: 1, height: 1, background: "#1a2740" }} />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 12, marginBottom: 20 }}>
-        {INST_PARAMS.map(p => <ParamChart key={p.name} paramName={p.name} unit={p.unit} color={p.color} allReadings={allReadings} />)}
+        {INST_PARAMS.map(p => <ParamChart key={p.name} paramName={p.name} unit={p.unit} color={p.color} allReadings={filtered} />)}
       </div>
     </div>
   );
@@ -1412,7 +1480,7 @@ export default function App() {
             </div>
           )}
 
-          {page === "dashboard_op" && isAdmin && <DashboardOperativo allReadings={allReadings} />}
+          {page === "dashboard_op" && isAdmin && <DashboardOperativo allReadings={allReadings} equipment={equipment} />}
 
           {page === "verificacion" && isAdmin && (() => {
             // Group readings by OT
