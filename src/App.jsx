@@ -107,7 +107,7 @@ const db = {
     return data || [];
   },
   async getParams(otId) { const { data } = await supabase.from("parameters").select("*").eq("ot_id", otId).order("sort_order"); return data || []; },
-  async getReadings(otId) { const { data } = await supabase.from("readings").select("*, parameters(name, unit)").eq("ot_id", otId).order("created_at"); return data || []; },
+  async getReadings(otId) { const { data } = await supabase.from("readings").select("*, parameters(name, unit, sort_order)").eq("ot_id", otId).order("created_at"); return data || []; },
   async getComments(otId) { const { data } = await supabase.from("comments").select("*, users(name, role, discipline)").eq("ot_id", otId).order("created_at"); return data || []; },
   async getAllReadings() { const { data } = await supabase.from("readings").select("*, parameters(name, unit), work_orders(discipline)").order("created_at"); return data || []; },
   async createLocation(loc) { const { data } = await supabase.from("locations").insert(loc).select().single(); return data; },
@@ -552,7 +552,74 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
     onStatusChange(ot.id, s);
   };
 
-  const TABS = [{ k: "params", l: "📏 Parámetros" }, { k: "comments", l: "💬 Bitácora" }, { k: "info", l: "ℹ️ Info" }, { k: "ji", l: "📖 Procedimiento" }];
+  const TABS = [{ k: "params", l: "📏 Parámetros" }, { k: "comments", l: "💬 Comentarios" }, { k: "info", l: "ℹ️ Info" }, { k: "ji", l: "📖 Procedimiento" }];
+
+  const closeAndExport = async () => {
+    // 1. Save all pending parameter readings
+    setSaving(true);
+    const entries = Object.entries(vals).filter(([, v]) => v && v.trim());
+    for (const [pid, val] of entries) {
+      const r = await db.addReading({ parameter_id: parseInt(pid), ot_id: ot.id, value: val, recorded_by: user.id });
+      if (r) setReadings(prev => [...prev, r]);
+    }
+    setVals({});
+
+    // 2. Close OT
+    await changeStatus("Cerrada");
+
+    // 3. Generate PDF
+    const allR = await db.getReadings(ot.id);
+    const allC = await db.getComments(ot.id);
+
+    const printWindow = window.open("", "_blank");
+    const paramRows = params.map(p => {
+      const rs = allR.filter(r => r.parameter_id === p.id);
+      const lastR = rs[rs.length - 1];
+      return "<tr><td style='padding:8px 12px;border-bottom:1px solid #eee;font-weight:500'>" + p.name + " (" + p.unit + ")</td><td style='padding:8px 12px;border-bottom:1px solid #eee;color:" + (lastR ? "#065f46" : "#999") + ";font-weight:700'>" + (lastR ? lastR.value + " " + p.unit : "Sin datos") + "</td><td style='padding:8px 12px;border-bottom:1px solid #eee;color:#666;font-size:11px'>" + (lastR ? new Date(lastR.created_at).toLocaleString("es-CO") : "—") + "</td></tr>";
+    }).join("");
+
+    const commentRows = allC.map(c => "<tr><td style='padding:8px 12px;border-bottom:1px solid #eee;color:#666;font-size:11px'>" + new Date(c.created_at).toLocaleString("es-CO") + "</td><td style='padding:8px 12px;border-bottom:1px solid #eee'>" + c.text + "</td></tr>").join("");
+
+    printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>OT ${ot.id}</title><style>
+      body{font-family:Arial,sans-serif;margin:30px;color:#111}
+      h1{font-size:20px;margin-bottom:4px}
+      h2{font-size:14px;color:#0076BE;margin:20px 0 8px;border-bottom:2px solid #0076BE;padding-bottom:4px}
+      .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:16px;border-bottom:3px solid #0076BE}
+      .logo{font-size:28px;font-weight:900;color:#0076BE;letter-spacing:2px}
+      .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;background:#e0f2fe;color:#0076BE}
+      table{width:100%;border-collapse:collapse;font-size:12px}
+      th{background:#0076BE;color:white;padding:8px 12px;text-align:left;font-size:11px}
+      tr:nth-child(even) td{background:#f8fafc}
+      .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+      .info-item{background:#f8fafc;padding:10px 14px;border-radius:6px;border-left:3px solid #0076BE}
+      .info-label{font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.05em}
+      .info-value{font-size:13px;font-weight:600;color:#111;margin-top:2px}
+      @media print{body{margin:15px}}
+    </style></head><body>
+    <div class="header">
+      <div><div class="logo">xylem</div><div style="font-size:10px;color:#666;margin-top:2px">LET'S SOLVE WATER</div></div>
+      <div style="text-align:right"><div style="font-size:18px;font-weight:700">Cierre de Orden de Trabajo</div><div style="font-size:11px;color:#666;margin-top:2px">Generado: ${new Date().toLocaleString("es-CO")}</div></div>
+    </div>
+    <h1>${ot.title}</h1>
+    <div style="margin-bottom:16px"><span class="badge">${ot.id}</span> &nbsp; <span class="badge" style="background:#dcfce7;color:#065f46">${ot.discipline}</span> &nbsp; <span class="badge" style="background:#ede9fe;color:#5b21b6">✅ Cerrada</span></div>
+    <div class="info-grid">
+      <div class="info-item"><div class="info-label">Descripción</div><div class="info-value">${ot.title}</div></div>
+      <div class="info-item"><div class="info-label">Disciplina</div><div class="info-value">${ot.discipline}</div></div>
+      <div class="info-item"><div class="info-label">Fecha Inicio</div><div class="info-value">${ot.created_at || "—"}</div></div>
+      <div class="info-item"><div class="info-label">Fecha Cierre</div><div class="info-value">${new Date().toLocaleDateString("es-CO")}</div></div>
+    </div>
+    <h2>📏 Parámetros Medidos</h2>
+    <table><thead><tr><th>Parámetro</th><th>Valor Registrado</th><th>Fecha / Hora</th></tr></thead><tbody>${paramRows}</tbody></table>
+    ${allC.length > 0 ? `<h2>💬 Comentarios</h2><table><thead><tr><th style="width:160px">Fecha</th><th>Comentario</th></tr></thead><tbody>${commentRows}</tbody></table>` : ""}
+    <div style="margin-top:30px;padding-top:16px;border-top:1px solid #eee;display:flex;justify-content:space-between;font-size:11px;color:#666">
+      <div>Técnico responsable: ${user.name}</div>
+      <div>MantPRO — Xylem · Sistema de Gestión de Mantenimiento</div>
+    </div>
+    <script>window.onload=()=>{window.print();}</script>
+    </body></html>`);
+    printWindow.document.close();
+    setSaving(false);
+  };
 
   return (
     <div className="ov" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -586,18 +653,20 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
                 {D_ICON[ot.discipline]} Parámetros {ot.discipline} — {params.length} campos
               </div>
               <div style={{ display: "flex", gap: 8 }}>
-                <button className="btn" onClick={saveAll} disabled={saving || Object.values(vals).every(v => !v?.trim())}
+                <button className="btn" onClick={saveAll} disabled={saving || Object.values(vals).every(v => !v?.trim()) || status === "Cerrada"}
                   style={{ background: "linear-gradient(135deg,#065f46,#0f766e)", color: "#34d399", padding: "7px 16px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
-                  {saving ? <><Spinner /> Guardando...</> : "💾 Guardar Todo"}
+                  {saving ? <><Spinner /> Guardando...</> : "💾 Guardar"}
                 </button>
-                {status !== "Cerrada" && (
-                  <button className="btn" onClick={async () => { await changeStatus("Cerrada"); }}
-                    style={{ background: "#2a1e3a", color: "#a78bfa", padding: "7px 14px", fontSize: 13, border: "1px solid #8b5cf6" }}>
-                    ✅ Cerrar OT
+                {status !== "Cerrada" ? (
+                  <button className="btn" onClick={closeAndExport} disabled={saving}
+                    style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "7px 16px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+                    {saving ? <><Spinner /> Procesando...</> : "✅ Cerrar OT y Descargar PDF"}
                   </button>
-                )}
-                {status === "Cerrada" && (
-                  <span style={{ fontSize: 12, color: "#a78bfa", alignSelf: "center", padding: "0 8px" }}>✅ OT Cerrada</span>
+                ) : (
+                  <button className="btn" onClick={closeAndExport}
+                    style={{ background: "#0f2040", color: "#60a5fa", padding: "7px 16px", fontSize: 13 }}>
+                    📄 Descargar PDF
+                  </button>
                 )}
               </div>
             </div>
@@ -794,12 +863,12 @@ function NewOT({ equipment, locations, jis, users, onClose, onSave }) {
 
 // ── NEW EQUIPMENT ─────────────────────────────────────────────
 function NewEquip({ locations, onClose, onSave }) {
-  const [f, setF] = useState({ code: "", name: "", type: "", location_id: "", discipline: "Mecánico", status: "Operativo" });
+  const [f, setF] = useState({ code: "", name: "", type: "", area: "", subarea: "", discipline: "Mecánico", status: "Operativo", location_id: null });
   const [saving, setSaving] = useState(false);
   const s = (k, v) => setF(p => ({ ...p, [k]: v }));
   const submit = async () => {
     setSaving(true);
-    const data = await db.createEquipment({ ...f, location_id: parseInt(f.location_id) || null });
+    const data = await db.createEquipment({ ...f, location_id: null });
     if (data) onSave(data);
     setSaving(false);
   };
@@ -817,12 +886,13 @@ function NewEquip({ locations, onClose, onSave }) {
           </div>
           <Lbl l="Nombre *"><input className="inp" placeholder="Nombre del equipo" value={f.name} onChange={e => s("name", e.target.value)} /></Lbl>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <Lbl l="Disciplina"><select className="inp" value={f.discipline} onChange={e => s("discipline", e.target.value)}>{DISCIPLINES.map(d => <option key={d}>{d}</option>)}</select></Lbl>
-            <Lbl l="Ubicación"><select className="inp" value={f.location_id} onChange={e => s("location_id", e.target.value)}><option value="">Seleccionar</option>{locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select></Lbl>
+            <Lbl l="Área"><input className="inp" placeholder="Área" value={f.area} onChange={e => s("area", e.target.value)} /></Lbl>
+            <Lbl l="Sub-área"><input className="inp" placeholder="Sub-área" value={f.subarea} onChange={e => s("subarea", e.target.value)} /></Lbl>
           </div>
+          <Lbl l="Disciplina"><select className="inp" value={f.discipline} onChange={e => s("discipline", e.target.value)}>{DISCIPLINES.map(d => <option key={d}>{d}</option>)}</select></Lbl>
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 }}>
             <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "8px 16px", fontSize: 13 }}>Cancelar</button>
-            <button className="btn" onClick={submit} disabled={!f.code || !f.name || saving} style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "8px 18px", fontSize: 13 }}>{saving ? "Guardando..." : "Guardar"}</button>
+            <button className="btn" onClick={submit} disabled={!f.code || saving} style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "8px 18px", fontSize: 13 }}>{saving ? "Guardando..." : "Guardar"}</button>
           </div>
         </div>
       </div>
@@ -956,9 +1026,9 @@ export default function App() {
     { k: "dashboard", i: "📊", l: "Dashboard" },
     { k: "ots", i: "📋", l: "Órdenes de Trabajo" },
     { k: "equipment", i: "🏭", l: "Equipos" },
-    { k: "locations", i: "📍", l: "Ubicaciones" },
     { k: "ji", i: "📖", l: "Job Instructions" },
     { k: "kpi", i: "📈", l: "Indicadores KPI" },
+    { k: "dashboard_op", i: "📡", l: "Dashboard Operativo" },
     { k: "users", i: "👥", l: "Usuarios" },
   ];
   const TECH_NAV = [
@@ -1050,39 +1120,38 @@ export default function App() {
           )}
 
           {page === "equipment" && isAdmin && (
-            <div className="fd" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {equipment.map(eq => {
-                const loc = locations.find(l => l.id === eq.location_id);
-                return (
-                  <div key={eq.id} className="card" style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{ width: 38, height: 38, background: "#060b14", borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>{D_ICON[eq.discipline]}</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 3 }}>
-                        <span style={{ fontFamily: "Syne,sans-serif", fontSize: 12, color: "#3b82f6", fontWeight: 700 }}>{eq.code}</span>
-                        <span className="tag" style={{ background: eq.status === "Operativo" ? "#1e3a2a" : "#3a2a1e", color: eq.status === "Operativo" ? "#34d399" : "#fbbf24", fontSize: 10 }}>{eq.status}</span>
-                      </div>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: "#f1f5f9" }}>{eq.name}</div>
-                      <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>{eq.type} · {loc?.name || "—"}</div>
-                    </div>
-                    <div style={{ fontSize: 11, color: D_COLOR[eq.discipline], fontWeight: 600 }}>{D_ICON[eq.discipline]} {eq.discipline}</div>
-                  </div>
-                );
-              })}
+            <div className="fd">
+              <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+                <button className="btn" onClick={() => setModal("importEquip")} style={{ background: "#0f2040", color: "#34d399", padding: "7px 14px", fontSize: 13 }}>📥 Importar Excel</button>
+                <button className="btn" onClick={() => setModal("newEquip")} style={{ background: "#0f2040", color: "#60a5fa", padding: "7px 14px", fontSize: 13 }}>+ Nuevo Equipo</button>
+              </div>
+              <div style={{ overflowX: "auto" }}>
+                <table className="ptable">
+                  <thead><tr>{["TAG / Código","Tipo","Área","Sub-área","Disciplina","Acciones"].map(h => <th key={h}>{h}</th>)}</tr></thead>
+                  <tbody>
+                    {equipment.map(eq => (
+                      <tr key={eq.id}>
+                        <td style={{ color: "#3b82f6", fontFamily: "Syne,sans-serif", fontWeight: 700 }}>{eq.code}</td>
+                        <td style={{ color: "#cbd5e1" }}>{eq.type || "—"}</td>
+                        <td style={{ color: "#94a3b8" }}>{eq.area || "—"}</td>
+                        <td style={{ color: "#94a3b8" }}>{eq.subarea || "—"}</td>
+                        <td><span style={{ color: D_COLOR[eq.discipline], fontSize: 12 }}>{D_ICON[eq.discipline]} {eq.discipline}</span></td>
+                        <td>
+                          <button className="btn" onClick={async () => {
+                            if (!window.confirm("¿Eliminar equipo " + eq.code + "?")) return;
+                            await supabase.from("equipment").delete().eq("id", eq.id);
+                            setEquipment(prev => prev.filter(e => e.id !== eq.id));
+                          }} style={{ background: "#3b0f0f", color: "#f87171", padding: "3px 10px", fontSize: 11 }}>Eliminar</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 
-          {page === "locations" && isAdmin && (
-            <div className="fd" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 12 }}>
-              {locations.map(loc => (
-                <div key={loc.id} className="card">
-                  <div style={{ fontSize: 20, marginBottom: 8 }}>📍</div>
-                  <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 14, color: "#f1f5f9" }}>{loc.name}</div>
-                  <div style={{ fontSize: 12, color: "#475569", marginTop: 4 }}>{loc.area} · {loc.level}</div>
-                  <div style={{ fontSize: 11, color: "#334155", marginTop: 6 }}>{equipment.filter(e => e.location_id === loc.id).length} equipos</div>
-                </div>
-              ))}
-            </div>
-          )}
+
 
           {page === "ji" && isAdmin && (
             <div className="fd" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -1146,10 +1215,19 @@ export default function App() {
             </div>
           )}
 
+          {page === "dashboard_op" && isAdmin && <DashboardOperativo allReadings={allReadings} />}
+
           {page === "users" && isAdmin && (
-            <div className="fd" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 12 }}>
+            <div className="fd" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))", gap: 12 }}>
               {users.map(u => (
-                <div key={u.id} className="card">
+                <div key={u.id} className="card" style={{ position: "relative" }}>
+                  {u.id !== user.id && (
+                    <button className="btn" onClick={async () => {
+                      if (!window.confirm("¿Eliminar usuario " + u.name + "?")) return;
+                      const { error } = await supabase.from("users").delete().eq("id", u.id);
+                      if (!error) setUsers(prev => prev.filter(x => x.id !== u.id));
+                    }} style={{ position: "absolute", top: 10, right: 10, background: "#3b0f0f", color: "#f87171", padding: "3px 8px", fontSize: 11, borderRadius: 5 }}>✕</button>
+                  )}
                   <div style={{ width: 42, height: 42, background: u.role === "admin" ? "linear-gradient(135deg,#1d4ed8,#7c3aed)" : "linear-gradient(135deg,#065f46,#0f766e)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, marginBottom: 10 }}>
                     {u.role === "admin" ? "👨‍💼" : "👷"}
                   </div>
@@ -1157,7 +1235,7 @@ export default function App() {
                   <div style={{ fontSize: 11, color: "#475569", marginTop: 3 }}>{u.email}</div>
                   <div style={{ marginTop: 8 }}>
                     <span className="tag" style={{ background: u.role === "admin" ? "#1e1e3a" : "#1e3a2a", color: u.role === "admin" ? "#a78bfa" : "#34d399" }}>
-                      {u.role === "admin" ? "Admin" : `Técnico · ${u.discipline}`}
+                      {u.role === "admin" ? "Admin" : "Técnico · " + u.discipline}
                     </span>
                   </div>
                 </div>
@@ -1178,6 +1256,7 @@ export default function App() {
       {modal === "newJI" && <NewJI onClose={closeModal} onSave={ji => { setJis(p => [...p, ji]); closeModal(); }} />}
       {modal === "newUser" && <NewUser onClose={closeModal} onSave={u => { setUsers(p => [...p, u]); closeModal(); }} />}
       {modal === "importExcel" && <ExcelImport onClose={closeModal} onImported={async () => { const data = await db.getOTs(user.id, isAdmin); setOts(data); }} />}
+      {modal === "importEquip" && <ImportEquip onClose={closeModal} onSave={eq => setEquipment(p => [...p, eq])} />}
       {modal === "searchOT" && <TechOTSearch user={user} onFound={ot => { setSelOT(ot); setModal("otDetail"); }} />}
     </div>
   );
