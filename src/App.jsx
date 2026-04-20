@@ -109,7 +109,7 @@ const db = {
   async getParams(otId) { const { data } = await supabase.from("parameters").select("*").eq("ot_id", otId).order("sort_order"); return data || []; },
   async getReadings(otId) { const { data } = await supabase.from("readings").select("*, parameters(name, unit, sort_order)").eq("ot_id", otId).order("created_at"); return data || []; },
   async getComments(otId) { const { data } = await supabase.from("comments").select("*, users(name, role, discipline)").eq("ot_id", otId).order("created_at"); return data || []; },
-  async getAllReadings() { const { data } = await supabase.from("readings").select("*, parameters(name, unit), work_orders(discipline)").order("created_at"); return data || []; },
+  async getAllReadings() { const { data } = await supabase.from("readings").select("*, parameters(name, unit, sort_order), work_orders(id, discipline, title, status)").order("created_at", { ascending: false }); return data || []; },
   async createLocation(loc) { const { data } = await supabase.from("locations").insert(loc).select().single(); return data; },
   async createEquipment(eq) { const { data } = await supabase.from("equipment").insert(eq).select().single(); return data; },
   async createJI(ji) { const { data } = await supabase.from("job_instructions").insert(ji).select().single(); return data; },
@@ -479,11 +479,12 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
   const [params, setParams] = useState([]);
   const [readings, setReadings] = useState([]);
   const [comments, setComments] = useState([]);
-  const [vals, setVals] = useState({});
-  const [comment, setComment] = useState("");
+  const [vals, setVals] = useState({});       // parámetros pendientes de guardar
+  const [comment, setComment] = useState(""); // comentario en borrador
   const [tab, setTab] = useState("params");
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState(ot.status);
+  const [autoSaved, setAutoSaved] = useState(false);
 
   const eq = equipment.find(e => e.id === ot.equipment_id);
   const loc = locations.find(l => l.id === ot.location_id);
@@ -529,15 +530,30 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
     return readings.filter(r => r.parameter_id === paramId);
   };
 
-  const saveAll = async () => {
-    setSaving(true);
-    const entries = Object.entries(vals).filter(([, v]) => v.trim());
+  // Guarda automáticamente los parámetros ingresados
+  const autoSaveParams = async () => {
+    const entries = Object.entries(vals).filter(([, v]) => v && v.trim());
+    if (entries.length === 0) return;
     for (const [pid, val] of entries) {
       const r = await db.addReading({ parameter_id: parseInt(pid), ot_id: ot.id, value: val, recorded_by: user.id });
       if (r) setReadings(prev => [...prev, r]);
     }
     setVals({});
-    setSaving(false);
+  };
+
+  // Guarda automáticamente el comentario en borrador
+  const autoSaveComment = async () => {
+    if (!comment.trim()) return;
+    const c = await db.addComment({ ot_id: ot.id, user_id: user.id, text: comment });
+    if (c) setComments(prev => [...prev, c]);
+    setComment("");
+  };
+
+  // Al cambiar de pestaña, autoguarda lo que hay pendiente
+  const switchTab = async (newTab) => {
+    if (tab === "params") await autoSaveParams();
+    if (tab === "comments") await autoSaveComment();
+    setTab(newTab);
   };
 
   const postComment = async () => {
@@ -556,19 +572,15 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
   const TABS = [{ k: "params", l: "📏 Parámetros" }, { k: "comments", l: "💬 Comentarios" }, { k: "info", l: "ℹ️ Info" }, { k: "ji", l: "📖 Procedimiento" }];
 
   const closeAndExport = async () => {
-    // 1. Save all pending parameter readings
     setSaving(true);
-    const entries = Object.entries(vals).filter(([, v]) => v && v.trim());
-    for (const [pid, val] of entries) {
-      const r = await db.addReading({ parameter_id: parseInt(pid), ot_id: ot.id, value: val, recorded_by: user.id });
-      if (r) setReadings(prev => [...prev, r]);
-    }
-    setVals({});
+    // 1. Guardar parámetros y comentario pendientes
+    await autoSaveParams();
+    await autoSaveComment();
 
-    // 2. Close OT
+    // 2. Cerrar OT
     await changeStatus("Cerrada");
 
-    // 3. Generate PDF
+    // 3. Obtener todos los datos actualizados
     const allR = await db.getReadings(ot.id);
     const allC = await db.getComments(ot.id);
 
@@ -653,7 +665,7 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
 
         <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "1px solid #14213a", paddingBottom: 10, flexWrap: "wrap" }}>
           {TABS.map(t => (
-            <button key={t.k} className="btn" onClick={() => setTab(t.k)}
+            <button key={t.k} className="btn" onClick={() => switchTab(t.k)}
               style={{ padding: "5px 13px", fontSize: 12, background: tab === t.k ? "#0f2040" : "transparent", color: tab === t.k ? "#60a5fa" : "#475569", border: `1px solid ${tab === t.k ? "#1d4ed8" : "transparent"}` }}>
               {t.l}
             </button>
@@ -666,10 +678,9 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
               <div style={{ fontSize: 12, color: D_COLOR[ot.discipline], fontWeight: 600 }}>
                 {D_ICON[ot.discipline]} Parámetros {ot.discipline} — {params.length} campos
               </div>
-              <button className="btn" onClick={saveAll} disabled={saving || Object.values(vals).every(v => !v?.trim()) || status === "Cerrada"}
-                style={{ background: "linear-gradient(135deg,#065f46,#0f766e)", color: "#34d399", padding: "7px 14px", fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
-                {saving ? <><Spinner /> Guardando...</> : "💾 Guardar"}
-              </button>
+              <div style={{ fontSize: 11, color: "#334155", fontStyle: "italic" }}>
+                💡 Se guarda automáticamente al cambiar de pestaña
+              </div>
             </div>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -742,8 +753,11 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
                 ))}
               </div>}
             <div style={{ borderTop: "1px solid #14213a", paddingTop: 12 }}>
-              <textarea className="inp" rows={3} placeholder="Escribe una novedad técnica..." value={comment} onChange={e => setComment(e.target.value)} style={{ resize: "vertical", marginBottom: 8 }} />
-              <button className="btn" onClick={postComment} disabled={!comment.trim()} style={{ background: "linear-gradient(135deg,#1d4ed8,#6d28d9)", color: "#fff", padding: "8px 16px", fontSize: 13 }}>Agregar comentario</button>
+              <textarea className="inp" rows={3} placeholder="Escribe una novedad técnica... (se guarda al cambiar de pestaña o al Cerrar OT)" value={comment} onChange={e => setComment(e.target.value)} style={{ resize: "vertical", marginBottom: 8 }} />
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <button className="btn" onClick={postComment} disabled={!comment.trim()} style={{ background: "#0f2040", color: "#60a5fa", padding: "7px 14px", fontSize: 12 }}>+ Agregar ahora</button>
+                <div style={{ fontSize: 11, color: "#334155", fontStyle: "italic" }}>💡 También se guarda automáticamente al cerrar la OT</div>
+              </div>
             </div>
           </div>
         )}
@@ -1390,71 +1404,100 @@ export default function App() {
 
           {page === "dashboard_op" && isAdmin && <DashboardOperativo allReadings={allReadings} />}
 
-          {page === "verificacion" && isAdmin && (
-            <div className="fd">
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
-                <div>
-                  <div style={{ fontFamily: "Syne,sans-serif", fontSize: 15, fontWeight: 700, color: "#f1f5f9" }}>Verificación de Información Ingresada</div>
-                  <div style={{ fontSize: 12, color: "#64748b", marginTop: 3 }}>{allReadings.length} lecturas registradas en total</div>
-                </div>
-                <div style={{ display: "flex", gap: 8 }}>
+          {page === "verificacion" && isAdmin && (() => {
+            // Group readings by OT
+            const grouped = {};
+            allReadings.forEach(r => {
+              if (!grouped[r.ot_id]) grouped[r.ot_id] = { disc: r.work_orders?.discipline || "", title: r.work_orders?.title || r.ot_id, status: r.work_orders?.status || "", readings: [] };
+              grouped[r.ot_id].readings.push(r);
+            });
+            const otList = Object.entries(grouped);
+
+            const downloadOTPDF = (otId, g) => {
+              const rows = g.readings.map(r =>
+                "<tr><td style='padding:7px 12px;border-bottom:1px solid #eee;font-weight:500'>" + (r.parameters?.name || "—") + " (" + (r.parameters?.unit || "") + ")</td>" +
+                "<td style='padding:7px 12px;border-bottom:1px solid #eee;color:#065f46;font-weight:700'>" + r.value + " " + (r.parameters?.unit || "") + "</td>" +
+                "<td style='padding:7px 12px;border-bottom:1px solid #eee;color:#666;font-size:11px'>" + (r.created_at ? new Date(r.created_at).toLocaleString("es-CO") : "—") + "</td></tr>"
+              ).join("");
+              const w = window.open("", "_blank");
+              w.document.write(
+                "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>OT " + otId + "</title>" +
+                "<style>body{font-family:Arial,sans-serif;margin:30px;color:#111}table{width:100%;border-collapse:collapse}th{background:#0076BE;color:white;padding:8px 12px;text-align:left;font-size:11px}td{font-size:12px}tr:nth-child(even) td{background:#f8fafc}@media print{body{margin:15px}}</style></head><body>" +
+                "<div style='display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:14px;border-bottom:3px solid #0076BE'>" +
+                "<div><div style='font-size:26px;font-weight:900;color:#0076BE;letter-spacing:2px'>xylem</div><div style='font-size:10px;color:#666'>LET'S SOLVE WATER</div></div>" +
+                "<div style='text-align:right'><div style='font-size:17px;font-weight:700'>Cierre de Orden de Trabajo</div><div style='font-size:11px;color:#666;margin-top:3px'>Generado: " + new Date().toLocaleString("es-CO") + "</div></div></div>" +
+                "<div style='margin-bottom:16px'><span style='background:#e0f2fe;color:#0076BE;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700'>" + otId + "</span> &nbsp;" +
+                "<span style='background:#dcfce7;color:#065f46;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700'>" + g.disc + "</span> &nbsp;" +
+                "<span style='background:#ede9fe;color:#5b21b6;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700'>✅ Cerrada</span></div>" +
+                "<p style='font-size:13px;color:#333;margin-bottom:16px'>" + g.title + "</p>" +
+                "<h3 style='font-size:13px;color:#0076BE;border-bottom:2px solid #0076BE;padding-bottom:4px;margin-bottom:10px'>Parámetros Medidos</h3>" +
+                "<table><thead><tr><th>Parámetro</th><th>Valor Registrado</th><th>Fecha / Hora</th></tr></thead><tbody>" + rows + "</tbody></table>" +
+                "<div style='margin-top:30px;padding-top:12px;border-top:1px solid #eee;display:flex;justify-content:space-between;font-size:11px;color:#666'>" +
+                "<div>MantPRO — Xylem · Sistema de Gestión de Mantenimiento</div><div>Fecha impresión: " + new Date().toLocaleDateString("es-CO") + "</div></div>" +
+                "<script>window.onload=()=>window.print()<\/script></body></html>"
+              );
+              w.document.close();
+            };
+
+            return (
+              <div className="fd">
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
+                  <div>
+                    <div style={{ fontFamily: "Syne,sans-serif", fontSize: 15, fontWeight: 700, color: "#f1f5f9" }}>Verificación de Información Ingresada</div>
+                    <div style={{ fontSize: 12, color: "#64748b", marginTop: 3 }}>{otList.length} OTs con lecturas · {allReadings.length} lecturas totales</div>
+                  </div>
                   <button className="btn" onClick={() => {
                     const XLSX = window.XLSX;
-                    if (!XLSX) { alert("Error: recarga la página"); return; }
-                    const rows = allReadings.map(r => ({
-                      "N° OT": r.ot_id || "",
-                      "Disciplina": r.work_orders?.discipline || "",
-                      "Parámetro": r.parameters?.name || "",
-                      "Unidad": r.parameters?.unit || "",
-                      "Valor": r.value || "",
-                      "Fecha": r.created_at ? new Date(r.created_at).toLocaleString("es-CO") : "",
-                    }));
+                    if (!XLSX) { alert("Recarga la página"); return; }
+                    const rows = allReadings.map(r => ({ "N° OT": r.ot_id || "", "Disciplina": r.work_orders?.discipline || "", "Parámetro": r.parameters?.name || "", "Unidad": r.parameters?.unit || "", "Valor": r.value || "", "Fecha": r.created_at ? new Date(r.created_at).toLocaleString("es-CO") : "" }));
                     const ws = XLSX.utils.json_to_sheet(rows);
                     const wb = XLSX.utils.book_new();
                     XLSX.utils.book_append_sheet(wb, ws, "Lecturas");
-                    XLSX.writeFile(wb, "verificacion_" + new Date().toLocaleDateString("es-CO").replace(/[/]/g, "-") + ".xlsx");
+                    XLSX.writeFile(wb, "verificacion_" + new Date().toLocaleDateString("es-CO").replace(/\//g, "-") + ".xlsx");
                   }} style={{ background: "#0f2040", color: "#60a5fa", padding: "8px 14px", fontSize: 13 }}>
-                    📊 Descargar Excel
-                  </button>
-                  <button className="btn" onClick={() => {
-                    const grouped = {};
-                    allReadings.forEach(r => {
-                      if (!grouped[r.ot_id]) grouped[r.ot_id] = { disc: r.work_orders?.discipline || "", readings: [] };
-                      grouped[r.ot_id].readings.push(r);
-                    });
-                    const otBlocks = Object.entries(grouped).map(([otId, g]) => {
-                      const rows = g.readings.map(r => "<tr><td style='padding:6px 10px;border-bottom:1px solid #eee;font-weight:500;font-size:12px'>" + (r.parameters?.name || "—") + "</td><td style='padding:6px 10px;border-bottom:1px solid #eee;color:#065f46;font-weight:700;font-size:13px'>" + r.value + " " + (r.parameters?.unit || "") + "</td><td style='padding:6px 10px;border-bottom:1px solid #eee;color:#666;font-size:11px'>" + (r.created_at ? new Date(r.created_at).toLocaleString("es-CO") : "—") + "</td></tr>").join("");
-                      return "<div style='margin-bottom:24px;page-break-inside:avoid'><div style='background:#0076BE;color:white;padding:8px 14px;border-radius:6px 6px 0 0;display:flex;justify-content:space-between'><strong>" + otId + "</strong><span style='font-size:11px;opacity:0.85'>" + g.disc + "</span></div><table style='width:100%;border-collapse:collapse;border:1px solid #ddd;border-top:none'><thead><tr style='background:#f0f9ff'><th style='padding:7px 10px;text-align:left;font-size:11px;color:#0076BE'>Parámetro</th><th style='padding:7px 10px;text-align:left;font-size:11px;color:#0076BE'>Valor</th><th style='padding:7px 10px;text-align:left;font-size:11px;color:#0076BE'>Fecha</th></tr></thead><tbody>" + rows + "</tbody></table></div>";
-                    }).join("");
-                    const w = window.open("", "_blank");
-                    w.document.write("<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Verificación Xylem</title><style>body{font-family:Arial,sans-serif;margin:30px;color:#111}@media print{body{margin:15px}}</style></head><body><div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #0076BE'><div><div style='font-size:28px;font-weight:900;color:#0076BE;letter-spacing:2px'>xylem</div><div style='font-size:10px;color:#666'>LET'S SOLVE WATER</div></div><div style='text-align:right'><div style='font-size:18px;font-weight:700'>Verificación de Parámetros</div><div style='font-size:11px;color:#666'>Generado: " + new Date().toLocaleString("es-CO") + "</div></div></div>" + otBlocks + "<script>window.onload=()=>window.print()<\/script></body></html>");
-                    w.document.close();
-                  }} style={{ background: "linear-gradient(135deg,#065f46,#0f766e)", color: "#34d399", padding: "8px 14px", fontSize: 13 }}>
-                    📄 Descargar PDF
+                    📊 Exportar Todo a Excel
                   </button>
                 </div>
+
+                {otList.length === 0 ? (
+                  <div style={{ textAlign: "center", color: "#334155", padding: 40 }}>No hay lecturas registradas aún. Los técnicos deben cerrar sus OTs para que aparezcan aquí.</div>
+                ) : otList.map(([otId, g]) => (
+                  <div key={otId} className="card" style={{ marginBottom: 14 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                      <div>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4 }}>
+                          <span style={{ fontFamily: "Syne,sans-serif", fontSize: 12, color: "#3b82f6", fontWeight: 700 }}>{otId}</span>
+                          <span className="tag" style={{ background: "#111c30", color: D_COLOR[g.disc] || "#64748b", fontSize: 10 }}>{D_ICON[g.disc] || ""} {g.disc}</span>
+                          {g.status === "Cerrada" && <span className="tag" style={{ background: "#2a1e3a", color: "#a78bfa", fontSize: 10 }}>✅ Cerrada</span>}
+                        </div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "#f1f5f9" }}>{g.title}</div>
+                        <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>{g.readings.length} lecturas registradas</div>
+                      </div>
+                      <button className="btn" onClick={() => downloadOTPDF(otId, g)}
+                        style={{ background: "linear-gradient(135deg,#065f46,#0f766e)", color: "#34d399", padding: "7px 14px", fontSize: 12, flexShrink: 0 }}>
+                        📄 Descargar PDF
+                      </button>
+                    </div>
+                    <div style={{ overflowX: "auto" }}>
+                      <table className="ptable">
+                        <thead><tr>{["Parámetro","Unidad","Valor","Fecha"].map(h => <th key={h}>{h}</th>)}</tr></thead>
+                        <tbody>
+                          {g.readings.map((r, i) => (
+                            <tr key={i}>
+                              <td style={{ color: "#cbd5e1", fontWeight: 500 }}>{r.parameters?.name || "—"}</td>
+                              <td style={{ color: "#64748b" }}>{r.parameters?.unit || "—"}</td>
+                              <td style={{ color: "#34d399", fontWeight: 700 }}>{r.value}</td>
+                              <td style={{ color: "#475569", fontSize: 11 }}>{r.created_at ? new Date(r.created_at).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" }) : "—"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div style={{ overflowX: "auto" }}>
-                <table className="ptable">
-                  <thead>
-                    <tr>{["N° OT","Disciplina","Parámetro","Unidad","Valor Ingresado","Fecha"].map(h => <th key={h}>{h}</th>)}</tr>
-                  </thead>
-                  <tbody>
-                    {allReadings.slice().reverse().map((r, i) => (
-                      <tr key={i}>
-                        <td style={{ color: "#3b82f6", fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 11 }}>{r.ot_id}</td>
-                        <td><span style={{ color: D_COLOR[r.work_orders?.discipline] || "#64748b", fontSize: 11 }}>{D_ICON[r.work_orders?.discipline] || ""} {r.work_orders?.discipline || "—"}</span></td>
-                        <td style={{ color: "#cbd5e1", fontSize: 12 }}>{r.parameters?.name || "—"}</td>
-                        <td style={{ color: "#64748b", fontSize: 11 }}>{r.parameters?.unit || "—"}</td>
-                        <td style={{ color: "#34d399", fontWeight: 700, fontSize: 13 }}>{r.value}</td>
-                        <td style={{ color: "#475569", fontSize: 11 }}>{r.created_at ? new Date(r.created_at).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" }) : "—"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
+            );
+          })()}
 
           {page === "users" && isAdmin && (
             <div className="fd" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))", gap: 12 }}>
@@ -1487,7 +1530,12 @@ export default function App() {
       {modal === "otDetail" && selOT && (
         <OTDetail ot={selOT} equipment={equipment} locations={locations} jis={jis} users={users} user={user} isAdmin={isAdmin}
           onClose={closeModal}
-          onStatusChange={(id, status) => setOts(prev => prev.map(o => o.id === id ? { ...o, status } : o))} />
+          onStatusChange={async (id, status) => {
+            setOts(prev => prev.map(o => o.id === id ? { ...o, status } : o));
+            // Refresh all readings so Verification page is updated
+            const fresh = await db.getAllReadings();
+            setAllReadings(fresh);
+          }} />
       )}
       {modal === "newOT" && <NewOT equipment={equipment} locations={locations} jis={jis} users={users} onClose={closeModal} onSave={ot => { setOts(p => [ot, ...p]); closeModal(); }} />}
       {modal === "newEquip" && <NewEquip locations={locations} onClose={closeModal} onSave={eq => { setEquipment(p => [...p, eq]); closeModal(); }} />}
