@@ -571,9 +571,10 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
       await db.addReading({ parameter_id: parseInt(pid), ot_id: ot.id, value: val, recorded_by: user.id });
     }
     setVals({});
-    // 2. Guardar comentario pendiente
-    if (comment.trim()) {
-      await db.addComment({ ot_id: ot.id, user_id: user.id, text: comment });
+    // 2. Guardar comentario pendiente (si hay texto sin guardar)
+    const pendingComment = comment.trim();
+    if (pendingComment) {
+      await db.addComment({ ot_id: ot.id, user_id: user.id, text: pendingComment });
       setComment("");
     }
     // 3. Cerrar OT
@@ -592,7 +593,7 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
       return "<tr><td style='padding:8px 12px;border-bottom:1px solid #eee;font-weight:500'>" + p.name + " (" + p.unit + ")</td><td style='padding:8px 12px;border-bottom:1px solid #eee;color:" + (lastR ? "#065f46" : "#999") + ";font-weight:700'>" + (lastR ? lastR.value + " " + p.unit : "Sin datos") + "</td><td style='padding:8px 12px;border-bottom:1px solid #eee;color:#666;font-size:11px'>" + (lastR ? new Date(lastR.created_at).toLocaleString("es-CO") : "—") + "</td></tr>";
     }).join("");
 
-    const commentRows = allC.length > 0 ? allC.map(c => "<tr><td style='padding:8px 12px;border-bottom:1px solid #eee;color:#666;font-size:11px'>" + (c.created_at ? new Date(c.created_at).toLocaleString("es-CO") : "—") + "</td><td style='padding:8px 12px;border-bottom:1px solid #eee'>" + (c.text || "") + "</td></tr>").join("") : "";
+    const commentRows = allC.length > 0 ? allC.map(c => "<tr><td style='padding:8px 12px;border-bottom:1px solid #eee;color:#666;font-size:11px'>" + (c.created_at ? new Date(c.created_at).toLocaleString("es-CO") : "—") + "</td><td style='padding:8px 12px;border-bottom:1px solid #eee;font-weight:500'>" + (c.users?.name || user.name || "Técnico") + "</td><td style='padding:8px 12px;border-bottom:1px solid #eee'>" + (c.text || "") + "</td></tr>").join("") : "";
 
     printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>OT ${ot.id}</title><style>
       body{font-family:Arial,sans-serif;margin:30px;color:#111}
@@ -624,7 +625,7 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
     </div>
     <h2>📏 Parámetros Medidos</h2>
     <table><thead><tr><th>Parámetro</th><th>Valor Registrado</th><th>Fecha / Hora</th></tr></thead><tbody>${paramRows}</tbody></table>
-    ${allC.length > 0 ? `<h2>💬 Comentarios</h2><table><thead><tr><th style="width:160px">Fecha</th><th>Comentario</th></tr></thead><tbody>${commentRows}</tbody></table>` : ""}
+    ${allC.length > 0 ? `<h2>💬 Comentarios</h2><table><thead><tr><th style="width:150px">Fecha</th><th style="width:150px">Técnico</th><th>Comentario</th></tr></thead><tbody>${commentRows}</tbody></table>` : "<p style=\"color:#999;font-size:12px;margin-top:8px\">Sin comentarios registrados.</p>"}
     <div style="margin-top:30px;padding-top:16px;border-top:1px solid #eee;display:flex;justify-content:space-between;font-size:11px;color:#666">
       <div>Técnico responsable: ${user.name}</div>
       <div>MantPRO — Xylem · Sistema de Gestión de Mantenimiento</div>
