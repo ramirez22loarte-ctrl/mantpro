@@ -208,81 +208,51 @@ function ExcelImport({ onClose, onImported }) {
     const XLSX = await import("https://cdn.sheetjs.com/xlsx-0.20.2/package/xlsx.mjs");
     const wb = XLSX.read(buf, { type: "array" });
     const ws = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
 
-    // Find header row - look for N° Orden de Trabajo column
-    const otRows = rows.filter(r => {
-      const vals = Object.values(r).map(v => String(v).toLowerCase());
-      return vals.some(v => v.match(/^\d{10}$/)); // SAP order number
-    });
+    // Encabezados en fila 12 (índice 11 en base 0)
+    // Datos desde fila 13 (índice 12 en base 0)
+    // C(2) = Tag, E(4) = N° OT, G(6) = Disciplina, H(7) = Descripción
+    const ref = XLSX.utils.decode_range(ws["!ref"] || "A1:Z1000");
+    const maxRow = ref.e.r;
+    const DATA_START_ROW = 12; // fila 13 en base 0
 
-    // Map columns flexibly
     const mapped = [];
     const seen = new Set();
-    for (const row of rows) {
-      const keys = Object.keys(row);
-      // Find OT number - 10 digit number
-      let otNum = "";
-      let disc = "";
-      let tag = "";
-      let desc = "";
 
-      for (const k of keys) {
-        const val = String(row[k]).trim();
-        if (!otNum && /^\d{10}$/.test(val)) otNum = val;
-        const kl = k.toLowerCase();
-        if (!disc && (kl.includes("disciplina") || kl.includes("disc"))) {
-          disc = DISC_MAP[val.toLowerCase().trim()] || val;
-        }
-        if (!tag && (kl.includes("clasificaci") || kl.includes("campo") || kl.includes("tag"))) {
-          tag = val;
-        }
-        if (!desc && (kl.includes("descripci") && kl.includes("actividad") || kl.includes("texto breve"))) {
-          desc = val;
-        }
-      }
+    for (let r = DATA_START_ROW; r <= maxRow; r++) {
+      const cellE = ws[XLSX.utils.encode_cell({ r, c: 4 })]; // col E = N° OT
+      const cellG = ws[XLSX.utils.encode_cell({ r, c: 6 })]; // col G = Disciplina
+      const cellC = ws[XLSX.utils.encode_cell({ r, c: 2 })]; // col C = Tag equipo
+      const cellH = ws[XLSX.utils.encode_cell({ r, c: 7 })]; // col H = Descripción
 
-      // Also try positional - N° OT is usually col 5 (index 4), Oper col 6, Disc col 7, Desc col 8
-      if (!otNum) {
-        for (const k of keys) {
-          const val = String(row[k]).trim();
-          if (/^\d{10}$/.test(val)) { otNum = val; break; }
-        }
-      }
-      if (!disc) {
-        const vals = Object.values(row).map(v => String(v).trim());
-        for (const v of vals) {
-          const mapped2 = DISC_MAP[v.toLowerCase()];
-          if (mapped2) { disc = mapped2; break; }
-        }
-      }
-      if (!tag) {
-        const vals = Object.entries(row);
-        for (const [k, v] of vals) {
-          if (String(v).includes(".") && String(v).length > 10 && !String(v).includes(" ")) {
-            tag = String(v); break;
-          }
-        }
-      }
-      if (!desc) {
-        const vals = Object.values(row).map(v => String(v).trim());
-        for (const v of vals) {
-          if (v.length > 10 && v.length < 200 && /[a-zA-Z]/.test(v) && !v.includes(".") ) {
-            desc = v; break;
-          }
-        }
-      }
+      if (!cellE || !cellG) continue;
+
+      const otNum = String(cellE.v).trim();
+      const discRaw = String(cellG.v || "").trim().toLowerCase();
+      const tag = cellC ? String(cellC.v).trim() : "";
+      const desc = cellH ? String(cellH.v).trim() : "";
+
+      if (!otNum || otNum === "" || !/^\d+$/.test(otNum)) continue;
+
+      const disc = DISC_MAP[discRaw] ||
+        (discRaw.includes("mec") ? "Mecánico" :
+         discRaw.includes("elec") ? "Eléctrico" :
+         discRaw.includes("inst") ? "Instrumentación" : "Mecánico");
 
       const key = otNum + "|" + disc;
-      if (otNum && disc && !seen.has(key)) {
+      if (!seen.has(key)) {
         seen.add(key);
-        mapped.push({ otNum, disc: disc || "Mecánico", tag, desc });
+        mapped.push({ otNum, disc, tag, desc });
       }
     }
 
-    setPreview(mapped.slice(0, 200));
+    setPreview(mapped.slice(0, 300));
     setLoading(false);
-    setStatus(`Se encontraron ${mapped.length} órdenes de trabajo únicas.`);
+    if (mapped.length === 0) {
+      setStatus("⚠️ No se encontraron OTs. Verifica que los datos empiecen en la fila 13.");
+    } else {
+      setStatus(`✅ Se encontraron ${mapped.length} órdenes de trabajo únicas.`);
+    }
   };
 
   const handleFile = async (f) => {
