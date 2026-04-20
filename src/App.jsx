@@ -490,7 +490,22 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
   const sc = S_COLOR[status] || S_COLOR["Abierta"];
 
   useEffect(() => {
-    db.getParams(ot.id).then(setParams);
+    const loadParams = async () => {
+      let p = await db.getParams(ot.id);
+      if (!p || p.length === 0) {
+        // No params in DB — create them from DEFAULT_PARAMS based on discipline
+        const disc = ot.discipline;
+        const defaults = (DEFAULT_PARAMS[disc] || []).map((dp, i) => ({
+          name: dp.name, unit: dp.unit, expected: "", ot_id: ot.id, sort_order: i
+        }));
+        if (defaults.length) {
+          const { data } = await supabase.from("parameters").insert(defaults).select();
+          p = data || defaults.map((d, i) => ({ ...d, id: i + 1 }));
+        }
+      }
+      setParams(p);
+    };
+    loadParams();
     db.getReadings(ot.id).then(setReadings);
     db.getComments(ot.id).then(setComments);
   }, [ot.id]);
@@ -553,30 +568,55 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
 
         {tab === "params" && (
           <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <div style={{ fontSize: 12, color: "#475569" }}>{params.length} parámetros · {readings.length} lecturas totales</div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              <div style={{ fontSize: 12, color: D_COLOR[ot.discipline], fontWeight: 600 }}>
+                {D_ICON[ot.discipline]} Parámetros {ot.discipline} — {params.length} campos
+              </div>
               <button className="btn" onClick={saveAll} disabled={saving || Object.values(vals).every(v => !v?.trim())}
-                style={{ background: "linear-gradient(135deg,#065f46,#0f766e)", color: "#34d399", padding: "6px 14px", fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                style={{ background: "linear-gradient(135deg,#065f46,#0f766e)", color: "#34d399", padding: "7px 16px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
                 {saving ? <><Spinner /> Guardando...</> : "💾 Guardar Todo"}
               </button>
             </div>
             <div style={{ overflowX: "auto" }}>
-              <table className="ptable">
-                <thead><tr><th>Parámetro</th><th>Unidad</th><th>Última lectura</th><th>Fecha</th><th>Ingresar valor</th></tr></thead>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: "#060b14" }}>
+                    <th style={{ padding: "10px 14px", textAlign: "left", color: "#475569", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: "2px solid #1a2740", width: "40%" }}>
+                      Parámetro
+                    </th>
+                    <th style={{ padding: "10px 14px", textAlign: "left", color: "#475569", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: "2px solid #1a2740", width: "20%" }}>
+                      Última lectura
+                    </th>
+                    <th style={{ padding: "10px 14px", textAlign: "left", color: "#475569", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: "2px solid #1a2740", width: "40%" }}>
+                      Ingresar Información
+                    </th>
+                  </tr>
+                </thead>
                 <tbody>
-                  {params.map(p => {
+                  {params.map((p, idx) => {
                     const last = lastReading(p.id);
                     return (
-                      <tr key={p.id}>
-                        <td style={{ color: "#cbd5e1", fontWeight: 500 }}>{p.name}</td>
-                        <td style={{ color: "#64748b" }}>{p.unit}</td>
-                        <td style={{ color: last ? "#34d399" : "#334155", fontWeight: last ? 700 : 400 }}>{last?.value || "—"}</td>
-                        <td style={{ color: "#475569", fontSize: 11 }}>{last ? new Date(last.created_at).toLocaleDateString("es-CO") : "—"}</td>
-                        <td>
-                          <div style={{ display: "flex", gap: 5 }}>
-                            <input className="inp" style={{ padding: "5px 8px", fontSize: 12 }} placeholder="Valor"
-                              value={vals[p.id] || ""} onChange={e => setVals(prev => ({ ...prev, [p.id]: e.target.value }))} />
-                          </div>
+                      <tr key={p.id} style={{ background: idx % 2 === 0 ? "#0b1629" : "#060b14", borderBottom: "1px solid #0f172a" }}>
+                        <td style={{ padding: "11px 14px", color: "#f1f5f9", fontWeight: 500 }}>
+                          {p.name}
+                          <span style={{ color: "#475569", fontSize: 11, marginLeft: 6 }}>({p.unit})</span>
+                        </td>
+                        <td style={{ padding: "11px 14px" }}>
+                          {last ? (
+                            <div>
+                              <span style={{ color: "#34d399", fontWeight: 700 }}>{last.value}</span>
+                              <span style={{ color: "#334155", fontSize: 10, marginLeft: 5 }}>{new Date(last.created_at).toLocaleDateString("es-CO")}</span>
+                            </div>
+                          ) : <span style={{ color: "#334155", fontSize: 11 }}>Sin datos</span>}
+                        </td>
+                        <td style={{ padding: "7px 14px" }}>
+                          <input
+                            className="inp"
+                            style={{ padding: "8px 12px", fontSize: 13, background: vals[p.id] ? "#0f2040" : "#07111f", borderColor: vals[p.id] ? "#3b82f6" : "#1a2740" }}
+                            placeholder={"Valor en " + p.unit}
+                            value={vals[p.id] || ""}
+                            onChange={e => setVals(prev => ({ ...prev, [p.id]: e.target.value }))}
+                          />
                         </td>
                       </tr>
                     );
