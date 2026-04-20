@@ -187,19 +187,24 @@ function Login({ onLogin }) {
   };
 
   return (
-    <div style={{ background: "#060b14", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div style={{ background: "linear-gradient(160deg,#03111f 60%,#003a6b 100%)", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
       <style>{CSS}</style>
       <div style={{ width: 380, background: "#0b1629", border: "1px solid #14213a", borderRadius: 16, padding: 36 }}>
         <div style={{ textAlign: "center", marginBottom: 28 }}>
-          <div style={{ width: 56, height: 56, background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, margin: "0 auto 14px" }}>🔧</div>
-          <div style={{ fontFamily: "Syne,sans-serif", fontSize: 24, fontWeight: 800, color: "#f1f5f9" }}>MantPRO</div>
-          <div style={{ fontSize: 12, color: "#475569", marginTop: 3 }}>Sistema de Gestión de Mantenimiento</div>
+          <div style={{ margin: "0 auto 20px", textAlign: "center" }}>
+            <svg width="160" height="52" viewBox="0 0 200 65" xmlns="http://www.w3.org/2000/svg">
+              <rect width="200" height="65" rx="10" fill="#0076BE"/>
+              <text x="100" y="38" fontFamily="Arial,sans-serif" fontSize="32" fontWeight="900" fill="white" textAnchor="middle" letterSpacing="2">xylem</text>
+              <text x="100" y="55" fontFamily="Arial,sans-serif" fontSize="9" fill="white" textAnchor="middle" letterSpacing="1" opacity="0.85">LET'S SOLVE WATER</text>
+            </svg>
+          </div>
+          <div style={{ fontSize: 13, color: "#60a5fa", marginTop: 0, fontWeight: 600, letterSpacing: "0.05em" }}>Portal de Mantenimiento Industrial</div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <Lbl l="Correo electrónico"><input className="inp" placeholder="usuario@empresa.com" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === "Enter" && go()} /></Lbl>
           <Lbl l="Contraseña"><input className="inp" type="password" placeholder="••••••••" value={pass} onChange={e => setPass(e.target.value)} onKeyDown={e => e.key === "Enter" && go()} /></Lbl>
           {err && <div style={{ fontSize: 12, color: "#f87171", background: "#3b0f0f", padding: "8px 12px", borderRadius: 7 }}>{err}</div>}
-          <button className="btn" onClick={go} disabled={loading} style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "12px", fontSize: 14, marginTop: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+          <button className="btn" onClick={go} disabled={loading} style={{ background: "#0076BE", color: "#fff", padding: "12px", fontSize: 14, marginTop: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 8 }}>
             {loading ? <><Spinner /> Ingresando...</> : "Ingresar"}
           </button>
         </div>
