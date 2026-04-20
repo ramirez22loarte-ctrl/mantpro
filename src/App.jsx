@@ -266,36 +266,39 @@ function ExcelImport({ onClose, onImported }) {
     if (!preview.length) return;
     setLoading(true);
     setStatus("Importando OTs...");
-    let ok = 0, fail = 0;
+    let ok = 0, fail = 0, errMsg = "";
     for (const row of preview) {
       const id = row.otNum;
       const ot = {
         id,
-        title: row.desc || `OT ${id}`,
+        title: row.desc || ("OT " + id),
         discipline: row.disc,
         priority: "Media",
         status: "Abierta",
-        description: row.desc || "",
-        asset: row.tag,
-        location: row.tag,
+        description: "Tag: " + row.tag + " | " + (row.desc || ""),
         created_at: new Date().toISOString().split("T")[0],
-        equipment_id: null, location_id: null, assigned_to: null, job_instruction_id: null,
+        equipment_id: null,
+        location_id: null,
+        assigned_to: null,
+        job_instruction_id: null,
+        due_date: null,
       };
-      try {
-        const { data: otData } = await supabase.from("work_orders").insert(ot).select().single();
-        if (otData) {
-          const defaultParams = (DEFAULT_PARAMS[row.disc] || []).map((p, i) => ({
-            name: p.name, unit: p.unit, expected: "", ot_id: otData.id, sort_order: i
-          }));
-          if (defaultParams.length) await supabase.from("parameters").insert(defaultParams);
-          ok++;
-        }
-      } catch(e) { fail++; }
-      setStatus(`Importando... ${ok + fail}/${preview.length}`);
+      const { data: otData, error } = await supabase.from("work_orders").insert(ot).select().single();
+      if (otData) {
+        const defaultParams = (DEFAULT_PARAMS[row.disc] || []).map((p, i) => ({
+          name: p.name, unit: p.unit, expected: "", ot_id: otData.id, sort_order: i
+        }));
+        if (defaultParams.length) await supabase.from("parameters").insert(defaultParams);
+        ok++;
+      } else {
+        fail++;
+        if (error && !errMsg) errMsg = error.message;
+      }
+      setStatus("Importando... " + (ok + fail) + "/" + preview.length);
     }
     setLoading(false);
     setDone(true);
-    setStatus(`✅ ${ok} OTs importadas correctamente. ${fail > 0 ? fail + " fallaron." : ""}`);
+    setStatus("✅ " + ok + " OTs importadas. " + (fail > 0 ? "⚠️ " + fail + " fallaron: " + errMsg : ""));
     onImported();
   };
 
