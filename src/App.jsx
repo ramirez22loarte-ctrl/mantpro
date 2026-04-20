@@ -635,7 +635,20 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
             <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 15, color: "#f1f5f9" }}>{ot.title}</div>
             <div style={{ fontSize: 11, color: "#475569", marginTop: 3 }}>{ot.id} · {eq?.name}</div>
           </div>
-          <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "5px 12px", flexShrink: 0 }}>✕</button>
+          <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+            {status !== "Cerrada" ? (
+              <button className="btn" onClick={closeAndExport} disabled={saving}
+                style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "6px 14px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+                {saving ? <><Spinner /> Procesando...</> : "✅ Cerrar OT"}
+              </button>
+            ) : (
+              <button className="btn" onClick={closeAndExport}
+                style={{ background: "#0f2040", color: "#60a5fa", padding: "6px 14px", fontSize: 13 }}>
+                📄 PDF
+              </button>
+            )}
+            <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "5px 12px" }}>✕</button>
+          </div>
         </div>
 
         <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "1px solid #14213a", paddingBottom: 10, flexWrap: "wrap" }}>
@@ -653,23 +666,10 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
               <div style={{ fontSize: 12, color: D_COLOR[ot.discipline], fontWeight: 600 }}>
                 {D_ICON[ot.discipline]} Parámetros {ot.discipline} — {params.length} campos
               </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button className="btn" onClick={saveAll} disabled={saving || Object.values(vals).every(v => !v?.trim()) || status === "Cerrada"}
-                  style={{ background: "linear-gradient(135deg,#065f46,#0f766e)", color: "#34d399", padding: "7px 16px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
-                  {saving ? <><Spinner /> Guardando...</> : "💾 Guardar"}
-                </button>
-                {status !== "Cerrada" ? (
-                  <button className="btn" onClick={closeAndExport} disabled={saving}
-                    style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "7px 16px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
-                    {saving ? <><Spinner /> Procesando...</> : "✅ Cerrar OT y Descargar PDF"}
-                  </button>
-                ) : (
-                  <button className="btn" onClick={closeAndExport}
-                    style={{ background: "#0f2040", color: "#60a5fa", padding: "7px 16px", fontSize: 13 }}>
-                    📄 Descargar PDF
-                  </button>
-                )}
-              </div>
+              <button className="btn" onClick={saveAll} disabled={saving || Object.values(vals).every(v => !v?.trim()) || status === "Cerrada"}
+                style={{ background: "linear-gradient(135deg,#065f46,#0f766e)", color: "#34d399", padding: "7px 14px", fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
+                {saving ? <><Spinner /> Guardando...</> : "💾 Guardar"}
+              </button>
             </div>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -977,6 +977,174 @@ function NewJI({ onClose, onSave }) {
 }
 
 // ── MAIN APP ─────────────────────────────────────────────────
+
+// ── PARAM CHART ───────────────────────────────────────────────
+const MEC_PARAMS = [
+  { name: "Caudal", unit: "L/S", color: "#00d4ff" },
+  { name: "Presión", unit: "PSI", color: "#7c3aed" },
+  { name: "T° Lado Libre Motor", unit: "°C", color: "#f59e0b" },
+  { name: "T° Lado Acople Motor", unit: "°C", color: "#ef4444" },
+  { name: "T° Lado Libre Bomba", unit: "°C", color: "#10b981" },
+  { name: "T° Lado Acople Bomba", unit: "°C", color: "#34d399" },
+  { name: "Vibración Axial Bomba", unit: "mm/s", color: "#60a5fa" },
+  { name: "Vibración Axial Motor", unit: "mm/s", color: "#a78bfa" },
+];
+const ELEC_PARAMS = [
+  { name: "Corriente Fase I", unit: "A", color: "#facc15" },
+  { name: "Corriente Fase II", unit: "A", color: "#f97316" },
+  { name: "Corriente Fase III", unit: "A", color: "#fb923c" },
+  { name: "Voltaje 1-2", unit: "V", color: "#a78bfa" },
+  { name: "Voltaje 2-3", unit: "V", color: "#818cf8" },
+  { name: "Potencia", unit: "W", color: "#34d399" },
+  { name: "Frecuencia", unit: "Hz", color: "#22d3ee" },
+];
+const INST_PARAMS = [
+  { name: "RTD01", unit: "°C", color: "#22d3ee" },
+  { name: "RTD02", unit: "°C", color: "#60a5fa" },
+  { name: "RTD03", unit: "°C", color: "#34d399" },
+  { name: "RTD04", unit: "°C", color: "#f59e0b" },
+  { name: "RTD05", unit: "°C", color: "#f97316" },
+  { name: "RTD06", unit: "°C", color: "#a78bfa" },
+  { name: "RTD07", unit: "°C", color: "#ef4444" },
+  { name: "RTD08", unit: "°C", color: "#10b981" },
+];
+
+function ParamChart({ paramName, unit, color, allReadings }) {
+  const data = allReadings
+    .filter(r => r.parameters && r.parameters.name === paramName)
+    .map(r => ({ fecha: new Date(r.created_at).toLocaleDateString("es-CO"), valor: parseFloat(r.value) || 0 }))
+    .slice(-15);
+  return (
+    <div className="card" style={{ marginBottom: 0 }}>
+      <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 12, color: color, marginBottom: 2 }}>{paramName}</div>
+      <div style={{ fontSize: 10, color: "#475569", marginBottom: 8 }}>{unit}</div>
+      {data.length > 0 ? (
+        <ResponsiveContainer width="100%" height={130}>
+          <LineChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#111c30" />
+            <XAxis dataKey="fecha" stroke="#334155" fontSize={8} tick={{ fill: "#475569" }} />
+            <YAxis stroke="#334155" fontSize={9} tick={{ fill: "#475569" }} width={35} />
+            <Tooltip contentStyle={{ background: "#0b1629", border: "1px solid #1a2740", borderRadius: 8, fontSize: 11, color: "#e2e8f0" }} />
+            <Line type="monotone" dataKey="valor" stroke={color} strokeWidth={2} dot={{ fill: color, r: 2 }} name={unit} />
+          </LineChart>
+        </ResponsiveContainer>
+      ) : (
+        <div style={{ height: 130, display: "flex", alignItems: "center", justifyContent: "center", color: "#334155", fontSize: 12 }}>Sin datos aún</div>
+      )}
+    </div>
+  );
+}
+
+function DashboardOperativo({ allReadings }) {
+  const total = allReadings.length;
+  const mec = allReadings.filter(r => r.work_orders && r.work_orders.discipline === "Mecánico").length;
+  const elec = allReadings.filter(r => r.work_orders && r.work_orders.discipline === "Eléctrico").length;
+  const inst = allReadings.filter(r => r.work_orders && r.work_orders.discipline === "Instrumentación").length;
+  return (
+    <div className="fd">
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 10, marginBottom: 20 }}>
+        {[
+          { l: "Total Lecturas", v: total, c: "#3b82f6", i: "📊" },
+          { l: "Mecánico", v: mec, c: "#f97316", i: "⚙️" },
+          { l: "Eléctrico", v: elec, c: "#facc15", i: "⚡" },
+          { l: "Instrumentación", v: inst, c: "#22d3ee", i: "📡" },
+        ].map(s => (
+          <div key={s.l} className="card" style={{ borderLeft: "3px solid " + s.c }}>
+            <div style={{ fontSize: 18, marginBottom: 4 }}>{s.i}</div>
+            <div style={{ fontFamily: "Syne,sans-serif", fontSize: 22, fontWeight: 800, color: s.c }}>{s.v}</div>
+            <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>{s.l}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ fontSize: 11, fontWeight: 600, color: "#f97316", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+        ⚙️ Parámetros Mecánicos <div style={{ flex: 1, height: 1, background: "#1a2740" }} />
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 12, marginBottom: 20 }}>
+        {MEC_PARAMS.map(p => <ParamChart key={p.name} paramName={p.name} unit={p.unit} color={p.color} allReadings={allReadings} />)}
+      </div>
+      <div style={{ fontSize: 11, fontWeight: 600, color: "#facc15", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+        ⚡ Parámetros Eléctricos <div style={{ flex: 1, height: 1, background: "#1a2740" }} />
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 12, marginBottom: 20 }}>
+        {ELEC_PARAMS.map(p => <ParamChart key={p.name} paramName={p.name} unit={p.unit} color={p.color} allReadings={allReadings} />)}
+      </div>
+      <div style={{ fontSize: 11, fontWeight: 600, color: "#22d3ee", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+        📡 Instrumentación <div style={{ flex: 1, height: 1, background: "#1a2740" }} />
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 12, marginBottom: 20 }}>
+        {INST_PARAMS.map(p => <ParamChart key={p.name} paramName={p.name} unit={p.unit} color={p.color} allReadings={allReadings} />)}
+      </div>
+    </div>
+  );
+}
+
+function ImportEquip({ onClose, onSave }) {
+  const [preview, setPreview] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState("");
+  const [done, setDone] = useState(false);
+  const fileRef = useRef();
+
+  const parseFile = async (f) => {
+    setLoading(true); setStatus("Leyendo Excel...");
+    try {
+      const buf = await f.arrayBuffer();
+      const XLSX = window.XLSX;
+      if (!XLSX) { setStatus("⚠️ Recarga la página."); setLoading(false); return; }
+      const wb = XLSX.read(new Uint8Array(buf), { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+      const get = (row, terms) => { for (const k of Object.keys(row)) { if (terms.some(t => k.toLowerCase().includes(t.toLowerCase()))) return String(row[k]).trim(); } return ""; };
+      const mapped = rows.map(r => ({ code: get(r, ["tag","codigo","código"]), name: get(r, ["tag","codigo","código"]) || "Equipo", type: get(r, ["tipo","type"]), area: get(r, ["area","área"]), subarea: get(r, ["subarea","sub"]), discipline: get(r, ["disciplina"]) || "Mecánico", status: "Operativo", location_id: null })).filter(r => r.code);
+      setPreview(mapped); setStatus("Se encontraron " + mapped.length + " equipos.");
+    } catch(e) { setStatus("⚠️ Error: " + e.message); }
+    setLoading(false);
+  };
+
+  const importAll = async () => {
+    setLoading(true); let ok = 0;
+    for (const eq of preview) { const { data } = await supabase.from("equipment").insert(eq).select().single(); if (data) { ok++; onSave(data); } }
+    setLoading(false); setDone(true); setStatus("✅ " + ok + " equipos importados.");
+  };
+
+  return (
+    <div className="ov" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="mod fd" style={{ width: 600 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 18 }}>
+          <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 16, color: "#f1f5f9" }}>📥 Importar Equipos desde Excel</div>
+          <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "5px 11px" }}>✕</button>
+        </div>
+        <div style={{ fontSize: 12, color: "#475569", marginBottom: 12, background: "#060b14", padding: "10px 14px", borderRadius: 8 }}>
+          Encabezados en <strong style={{ color: "#60a5fa" }}>fila 1</strong>, datos desde <strong style={{ color: "#60a5fa" }}>fila 2</strong>. Columnas: <strong style={{ color: "#34d399" }}>TAG, TIPO, AREA, SUBAREA</strong>
+        </div>
+        <div onClick={() => fileRef.current && fileRef.current.click()} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) parseFile(f); }}
+          style={{ border: "2px dashed #1a2740", borderRadius: 10, padding: 24, textAlign: "center", cursor: "pointer", marginBottom: 14, background: "#060b14" }}>
+          <div style={{ fontSize: 28, marginBottom: 6 }}>📊</div>
+          <div style={{ fontSize: 13, color: "#64748b" }}>Arrastra o haz clic para seleccionar</div>
+          <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: "none" }} onChange={e => { const f = e.target.files[0]; if (f) parseFile(f); }} />
+        </div>
+        {loading && <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#64748b", fontSize: 13, marginBottom: 10 }}><div className="spin" /> {status}</div>}
+        {!loading && status && <div style={{ fontSize: 13, color: done ? "#34d399" : "#60a5fa", marginBottom: 12, padding: "8px 12px", background: "#060b14", borderRadius: 7 }}>{status}</div>}
+        {preview.length > 0 && !done && (
+          <div>
+            <div style={{ overflowX: "auto", marginBottom: 12 }}>
+              <table className="ptable">
+                <thead><tr>{["TAG","Tipo","Área","Sub-área","Disciplina"].map(h => <th key={h}>{h}</th>)}</tr></thead>
+                <tbody>{preview.slice(0, 8).map((r, i) => <tr key={i}><td style={{ color: "#3b82f6", fontWeight: 700 }}>{r.code}</td><td style={{ color: "#cbd5e1" }}>{r.type || "—"}</td><td style={{ color: "#94a3b8" }}>{r.area || "—"}</td><td style={{ color: "#94a3b8" }}>{r.subarea || "—"}</td><td style={{ color: D_COLOR[r.discipline] || "#64748b" }}>{r.discipline}</td></tr>)}</tbody>
+              </table>
+            </div>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "8px 16px", fontSize: 13 }}>Cancelar</button>
+              <button className="btn" onClick={importAll} disabled={loading} style={{ background: "linear-gradient(135deg,#065f46,#0f766e)", color: "#34d399", padding: "8px 18px", fontSize: 13 }}>⬆️ Importar {preview.length} equipos</button>
+            </div>
+          </div>
+        )}
+        {done && <div style={{ display: "flex", justifyContent: "flex-end" }}><button className="btn" onClick={onClose} style={{ background: "#0f2040", color: "#60a5fa", padding: "8px 18px", fontSize: 13 }}>Cerrar</button></div>}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [locations, setLocations] = useState([]);
@@ -1224,35 +1392,52 @@ export default function App() {
 
           {page === "verificacion" && isAdmin && (
             <div className="fd">
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-                <div style={{ fontSize: 13, color: "#64748b" }}>
-                  {allReadings.length} lecturas registradas en total
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
+                <div>
+                  <div style={{ fontFamily: "Syne,sans-serif", fontSize: 15, fontWeight: 700, color: "#f1f5f9" }}>Verificación de Información Ingresada</div>
+                  <div style={{ fontSize: 12, color: "#64748b", marginTop: 3 }}>{allReadings.length} lecturas registradas en total</div>
                 </div>
-                <button className="btn" onClick={() => {
-                  const XLSX = window.XLSX;
-                  if (!XLSX) { alert("Error: librería Excel no cargada"); return; }
-                  const rows = allReadings.map(r => ({
-                    "N° OT": r.ot_id || "",
-                    "Disciplina": r.work_orders?.discipline || "",
-                    "Parámetro": r.parameters?.name || "",
-                    "Unidad": r.parameters?.unit || "",
-                    "Valor": r.value || "",
-                    "Fecha": r.created_at ? new Date(r.created_at).toLocaleString("es-CO") : "",
-                  }));
-                  const ws = XLSX.utils.json_to_sheet(rows);
-                  const wb = XLSX.utils.book_new();
-                  XLSX.utils.book_append_sheet(wb, ws, "Lecturas");
-                  XLSX.writeFile(wb, "verificacion_parametros_" + new Date().toLocaleDateString("es-CO").replace(/\//g, "-") + ".xlsx");
-                }} style={{ background: "linear-gradient(135deg,#065f46,#0f766e)", color: "#34d399", padding: "8px 18px", fontSize: 13 }}>
-                  📥 Descargar Excel
-                </button>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button className="btn" onClick={() => {
+                    const XLSX = window.XLSX;
+                    if (!XLSX) { alert("Error: recarga la página"); return; }
+                    const rows = allReadings.map(r => ({
+                      "N° OT": r.ot_id || "",
+                      "Disciplina": r.work_orders?.discipline || "",
+                      "Parámetro": r.parameters?.name || "",
+                      "Unidad": r.parameters?.unit || "",
+                      "Valor": r.value || "",
+                      "Fecha": r.created_at ? new Date(r.created_at).toLocaleString("es-CO") : "",
+                    }));
+                    const ws = XLSX.utils.json_to_sheet(rows);
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, "Lecturas");
+                    XLSX.writeFile(wb, "verificacion_" + new Date().toLocaleDateString("es-CO").replace(/[/]/g, "-") + ".xlsx");
+                  }} style={{ background: "#0f2040", color: "#60a5fa", padding: "8px 14px", fontSize: 13 }}>
+                    📊 Descargar Excel
+                  </button>
+                  <button className="btn" onClick={() => {
+                    const grouped = {};
+                    allReadings.forEach(r => {
+                      if (!grouped[r.ot_id]) grouped[r.ot_id] = { disc: r.work_orders?.discipline || "", readings: [] };
+                      grouped[r.ot_id].readings.push(r);
+                    });
+                    const otBlocks = Object.entries(grouped).map(([otId, g]) => {
+                      const rows = g.readings.map(r => "<tr><td style='padding:6px 10px;border-bottom:1px solid #eee;font-weight:500;font-size:12px'>" + (r.parameters?.name || "—") + "</td><td style='padding:6px 10px;border-bottom:1px solid #eee;color:#065f46;font-weight:700;font-size:13px'>" + r.value + " " + (r.parameters?.unit || "") + "</td><td style='padding:6px 10px;border-bottom:1px solid #eee;color:#666;font-size:11px'>" + (r.created_at ? new Date(r.created_at).toLocaleString("es-CO") : "—") + "</td></tr>").join("");
+                      return "<div style='margin-bottom:24px;page-break-inside:avoid'><div style='background:#0076BE;color:white;padding:8px 14px;border-radius:6px 6px 0 0;display:flex;justify-content:space-between'><strong>" + otId + "</strong><span style='font-size:11px;opacity:0.85'>" + g.disc + "</span></div><table style='width:100%;border-collapse:collapse;border:1px solid #ddd;border-top:none'><thead><tr style='background:#f0f9ff'><th style='padding:7px 10px;text-align:left;font-size:11px;color:#0076BE'>Parámetro</th><th style='padding:7px 10px;text-align:left;font-size:11px;color:#0076BE'>Valor</th><th style='padding:7px 10px;text-align:left;font-size:11px;color:#0076BE'>Fecha</th></tr></thead><tbody>" + rows + "</tbody></table></div>";
+                    }).join("");
+                    const w = window.open("", "_blank");
+                    w.document.write("<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Verificación Xylem</title><style>body{font-family:Arial,sans-serif;margin:30px;color:#111}@media print{body{margin:15px}}</style></head><body><div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #0076BE'><div><div style='font-size:28px;font-weight:900;color:#0076BE;letter-spacing:2px'>xylem</div><div style='font-size:10px;color:#666'>LET'S SOLVE WATER</div></div><div style='text-align:right'><div style='font-size:18px;font-weight:700'>Verificación de Parámetros</div><div style='font-size:11px;color:#666'>Generado: " + new Date().toLocaleString("es-CO") + "</div></div></div>" + otBlocks + "<script>window.onload=()=>window.print()<\/script></body></html>");
+                    w.document.close();
+                  }} style={{ background: "linear-gradient(135deg,#065f46,#0f766e)", color: "#34d399", padding: "8px 14px", fontSize: 13 }}>
+                    📄 Descargar PDF
+                  </button>
+                </div>
               </div>
               <div style={{ overflowX: "auto" }}>
                 <table className="ptable">
                   <thead>
-                    <tr>
-                      {["N° OT","Disciplina","Parámetro","Unidad","Valor","Fecha"].map(h => <th key={h}>{h}</th>)}
-                    </tr>
+                    <tr>{["N° OT","Disciplina","Parámetro","Unidad","Valor Ingresado","Fecha"].map(h => <th key={h}>{h}</th>)}</tr>
                   </thead>
                   <tbody>
                     {allReadings.slice().reverse().map((r, i) => (
