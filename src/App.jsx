@@ -1707,18 +1707,30 @@ export default function App() {
                       const wsData = [];
 
                       // Row 1: Headers group title
-                      const headerRow1 = ["N° OT", "Disciplina", ...params.map((_,i) => i === 0 ? "PARAMETROS " + disc.toUpperCase() : "")];
+                      const headerRow1 = ["N° OT", "Disciplina", ...params.map((_,i) => i === 0 ? "PARAMETROS " + disc.toUpperCase() : ""), "COMENTARIOS", "", ""];
                       wsData.push(headerRow1);
 
                       // Row 2: Column headers
-                      const headerRow2 = ["N° OT", "Disciplina", ...params];
+                      const headerRow2 = ["N° OT", "Disciplina", ...params, "Técnico", "Comentario", "Fecha"];
                       wsData.push(headerRow2);
 
                       // Data rows
                       otRows.forEach(([otId, g]) => {
-                        const row = [otId, g.disc];
-                        params.forEach(p => row.push(g.readings[p] || ""));
-                        wsData.push(row);
+                        const comms = commentsByOT[otId] || [];
+                        if (comms.length === 0) {
+                          const row = [otId, g.disc];
+                          params.forEach(p => row.push(g.readings[p] || ""));
+                          row.push("", "", "");
+                          wsData.push(row);
+                        } else {
+                          comms.forEach((c, ci) => {
+                            const row = ci === 0 ? [otId, g.disc] : ["", ""];
+                            if (ci === 0) params.forEach(p => row.push(g.readings[p] || ""));
+                            else params.forEach(() => row.push(""));
+                            row.push(c.author || "", c.text || "", c.created_at ? new Date(c.created_at).toLocaleString("es-CO") : "");
+                            wsData.push(row);
+                          });
+                        }
                       });
 
                       const ws = XLSX.utils.aoa_to_sheet(wsData);
@@ -1726,34 +1738,21 @@ export default function App() {
                       // Merge cells for group title
                       if (!ws["!merges"]) ws["!merges"] = [];
                       ws["!merges"].push({ s: { r: 0, c: 2 }, e: { r: 0, c: params.length + 1 } });
+                      ws["!merges"].push({ s: { r: 0, c: params.length + 2 }, e: { r: 0, c: params.length + 4 } });
 
                       // Column widths
-                      ws["!cols"] = [{ wch: 18 }, { wch: 14 }, ...params.map(() => ({ wch: 22 }))];
+                      ws["!cols"] = [{ wch: 18 }, { wch: 14 }, ...params.map(() => ({ wch: 20 })), { wch: 18 }, { wch: 40 }, { wch: 22 }];
 
                       XLSX.utils.book_append_sheet(wb, ws, disc.substring(0, 31));
                     });
 
-                    // Add Comentarios sheet - fetch comments from grouped data
-                    // Comments are already loaded in the otList variable via allReadings
-                    // We need to get comments separately - use supabase directly
+                    // Fetch comments to include in each discipline sheet
                     const { data: allComments } = await supabase.from("comments").select("*").order("created_at");
-                    if (allComments && allComments.length > 0) {
-                      const commWsData = [
-                        ["N° OT", "Técnico", "Disciplina", "Comentario", "Fecha"]
-                      ];
-                      allComments.forEach(c => {
-                        commWsData.push([
-                          c.ot_id || "",
-                          c.author || "",
-                          c.discipline || "",
-                          c.text || "",
-                          c.created_at ? new Date(c.created_at).toLocaleString("es-CO") : ""
-                        ]);
-                      });
-                      const commWs = XLSX.utils.aoa_to_sheet(commWsData);
-                      commWs["!cols"] = [{ wch: 18 }, { wch: 20 }, { wch: 16 }, { wch: 50 }, { wch: 22 }];
-                      XLSX.utils.book_append_sheet(wb, commWs, "Comentarios");
-                    }
+                    const commentsByOT = {};
+                    (allComments || []).forEach(c => {
+                      if (!commentsByOT[c.ot_id]) commentsByOT[c.ot_id] = [];
+                      commentsByOT[c.ot_id].push(c);
+                    });
 
                     XLSX.writeFile(wb, "verificacion_parametros_" + new Date().toLocaleDateString("es-CO").replace(/\//g, "-") + ".xlsx");
                   }} style={{ background: "#0f2040", color: "#60a5fa", padding: "8px 14px", fontSize: 13 }}>
