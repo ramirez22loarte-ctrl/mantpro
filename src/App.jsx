@@ -1055,11 +1055,13 @@ function DashboardOperativo({ allReadings, equipment }) {
   const [filterFecha, setFilterFecha] = useState("");
   const [filterTag, setFilterTag] = useState("");
   const [filterArea, setFilterArea] = useState("");
+  const [filterSubarea, setFilterSubarea] = useState("");
 
   // Build filter options from data
   const fechas = [...new Set(allReadings.map(r => r.created_at ? new Date(r.created_at).toLocaleDateString("es-CO") : "").filter(Boolean))].sort().reverse();
   const tags = [...new Set(equipment.map(e => e.code).filter(Boolean))].sort();
   const areas = [...new Set(equipment.map(e => e.area).filter(Boolean))].sort();
+  const subareas = [...new Set(equipment.map(e => e.subarea).filter(Boolean))].sort();
 
   // Helper: find equipment tag from OT description or title
   // OT description format: "Tag: PPC075 | description" or title contains tag
@@ -1092,6 +1094,11 @@ function DashboardOperativo({ allReadings, equipment }) {
       const otArea = getOTArea(r);
       if (otArea !== filterArea) return false;
     }
+    if (filterSubarea) {
+      const tag = getOTTag(r);
+      const eq = equipment.find(e => e.code === tag);
+      if ((eq?.subarea || "") !== filterSubarea) return false;
+    }
     return true;
   });
 
@@ -1100,8 +1107,8 @@ function DashboardOperativo({ allReadings, equipment }) {
   const elec = filtered.filter(r => r.work_orders && r.work_orders.discipline === "Eléctrico").length;
   const inst = filtered.filter(r => r.work_orders && r.work_orders.discipline === "Instrumentación").length;
 
-  const clearFilters = () => { setFilterFecha(""); setFilterTag(""); setFilterArea(""); };
-  const hasFilters = filterFecha || filterTag || filterArea;
+  const clearFilters = () => { setFilterFecha(""); setFilterTag(""); setFilterArea(""); setFilterSubarea(""); };
+  const hasFilters = filterFecha || filterTag || filterArea || filterSubarea;
 
   return (
     <div className="fd">
@@ -1130,6 +1137,13 @@ function DashboardOperativo({ allReadings, equipment }) {
               {areas.map(a => <option key={a} value={a}>{a}</option>)}
             </select>
           </div>
+          <div style={{ flex: 1, minWidth: 160 }}>
+            <div style={{ fontSize: 10, color: "#475569", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>Sub-Área</div>
+            <select className="inp" value={filterSubarea} onChange={e => setFilterSubarea(e.target.value)}>
+              <option value="">Todas las sub-áreas</option>
+              {subareas.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
           {hasFilters && (
             <button className="btn" onClick={clearFilters} style={{ background: "#3b0f0f", color: "#f87171", padding: "8px 14px", fontSize: 12 }}>
               ✕ Limpiar filtros
@@ -1142,6 +1156,7 @@ function DashboardOperativo({ allReadings, equipment }) {
             {filterFecha && <span style={{ marginLeft: 8, background: "#0f2040", padding: "2px 8px", borderRadius: 99, fontSize: 11 }}>📅 {filterFecha}</span>}
             {filterTag && <span style={{ marginLeft: 8, background: "#0f2040", padding: "2px 8px", borderRadius: 99, fontSize: 11 }}>🏷️ {filterTag}</span>}
             {filterArea && <span style={{ marginLeft: 8, background: "#0f2040", padding: "2px 8px", borderRadius: 99, fontSize: 11 }}>📍 {filterArea}</span>}
+            {filterSubarea && <span style={{ marginLeft: 8, background: "#0f2040", padding: "2px 8px", borderRadius: 99, fontSize: 11 }}>📌 {filterSubarea}</span>}
           </div>
         )}
       </div>
