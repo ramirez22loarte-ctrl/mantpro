@@ -202,9 +202,19 @@ function ExcelImport({ onClose, onImported }) {
   const fileRef = useRef();
 
   const DISC_MAP = {
-    "mecánico": "Mecánico", "mecanico": "Mecánico",
-    "electricidad": "Eléctrico", "eléctrico": "Eléctrico", "electrico": "Eléctrico", "elec": "Eléctrico",
-    "instrumentación": "Instrumentación", "instrumentacion": "Instrumentación", "inst": "Instrumentación",
+    "mecánico": "Mecánico", "mecanico": "Mecánico", "mec": "Mecánico",
+    "electricidad": "Eléctrico", "eléctrico": "Eléctrico", "electrico": "Eléctrico",
+    "elec": "Eléctrico", "eléctricidad": "Eléctrico", "electircidad": "Eléctrico",
+    "instrumentación": "Instrumentación", "instrumentacion": "Instrumentación",
+    "inst": "Instrumentación", "instrumentacion": "Instrumentación",
+  };
+  const normalizeDisc = (raw) => {
+    const r = raw.toLowerCase().trim();
+    if (DISC_MAP[r]) return DISC_MAP[r];
+    if (r.includes("mec")) return "Mecánico";
+    if (r.includes("elec") || r.includes("electr")) return "Eléctrico";
+    if (r.includes("inst")) return "Instrumentación";
+    return "Mecánico";
   };
 
   const parseExcel = async (f) => {
@@ -249,10 +259,7 @@ function ExcelImport({ onClose, onImported }) {
 
       if (!otNum || otNum === "" || !/^\d+$/.test(otNum)) continue;
 
-      const disc = DISC_MAP[discRaw] ||
-        (discRaw.includes("mec") ? "Mecánico" :
-         discRaw.includes("elec") ? "Eléctrico" :
-         discRaw.includes("inst") ? "Instrumentación" : "Mecánico");
+      const disc = normalizeDisc(discRaw);
 
       const key = otNum + "|" + disc;
       if (!seen.has(key)) {
@@ -1321,6 +1328,7 @@ export default function App() {
   const [sideOpen, setSideOpen] = useState(true);
   const [loading, setLoading] = useState(false);
   const [filterOTDisc, setFilterOTDisc] = useState("");
+  const [selectedOTs, setSelectedOTs] = useState(new Set());
 
   const isAdmin = user?.role === "admin";
   const myOTsAll = isAdmin ? ots : ots.filter(o => o.assigned_to === user?.id);
@@ -1460,24 +1468,68 @@ export default function App() {
 
           {page === "ots" && (
             <div className="fd" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {filterOTDisc && (
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-                  <span style={{ fontSize: 13, color: D_COLOR[filterOTDisc], fontWeight: 600 }}>{filterOTDisc && D_ICON[filterOTDisc]} Filtrando: {filterOTDisc}</span>
-                  <button className="btn" onClick={() => setFilterOTDisc("")} style={{ background: "#3b0f0f", color: "#f87171", padding: "3px 10px", fontSize: 11 }}>✕ Limpiar filtro</button>
-                  <span style={{ fontSize: 11, color: "#475569" }}>{myOTs.length} de {myOTsAll.length} OTs</span>
-                </div>
-              )}
+              {/* Filter + bulk actions bar */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 4 }}>
+                {filterOTDisc && (
+                  <>
+                    <span style={{ fontSize: 13, color: D_COLOR[filterOTDisc], fontWeight: 600 }}>{D_ICON[filterOTDisc]} Filtrando: {filterOTDisc}</span>
+                    <button className="btn" onClick={() => setFilterOTDisc("")} style={{ background: "#3b0f0f", color: "#f87171", padding: "3px 10px", fontSize: 11 }}>✕ Limpiar</button>
+                    <span style={{ fontSize: 11, color: "#475569" }}>{myOTs.length} de {myOTsAll.length} OTs</span>
+                  </>
+                )}
+                {isAdmin && myOTs.length > 0 && (
+                  <>
+                    <button className="btn" onClick={() => {
+                      if (selectedOTs.size === myOTs.length) setSelectedOTs(new Set());
+                      else setSelectedOTs(new Set(myOTs.map(o => o.id)));
+                    }} style={{ background: "#111c30", color: "#60a5fa", padding: "4px 12px", fontSize: 12, marginLeft: "auto" }}>
+                      {selectedOTs.size === myOTs.length ? "☐ Deseleccionar todo" : "☑ Seleccionar todo"}
+                    </button>
+                    {selectedOTs.size > 0 && (
+                      <button className="btn" onClick={async () => {
+                        if (!window.confirm("¿Eliminar " + selectedOTs.size + " OTs seleccionadas? Se eliminarán todos sus datos.")) return;
+                        for (const id of selectedOTs) {
+                          await db.deleteOT(id);
+                        }
+                        setOts(prev => prev.filter(o => !selectedOTs.has(o.id)));
+                        setSelectedOTs(new Set());
+                        const fresh = await db.getAllReadings();
+                        setAllReadings(fresh);
+                      }} style={{ background: "#3b0f0f", color: "#f87171", padding: "4px 14px", fontSize: 12 }}>
+                        🗑️ Eliminar {selectedOTs.size} seleccionadas
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
               {myOTs.length === 0 ? <div style={{ textAlign: "center", color: "#334155", padding: 40 }}>No hay órdenes. {isAdmin && "Crea la primera con '+ Nueva OT'."}</div>
-                : myOTs.map(ot => <OTRow key={ot.id} ot={ot} equipment={equipment}
-                    onClick={() => { setSelOT(ot); setModal("otDetail"); }}
-                    onDelete={isAdmin ? async (id) => {
-                      if (!window.confirm("¿Eliminar OT " + id + "? Se eliminarán todos los parámetros, lecturas y comentarios.")) return;
-                      await db.deleteOT(id);
-                      setOts(prev => prev.filter(o => o.id !== id));
-                      const fresh = await db.getAllReadings();
-                      setAllReadings(fresh);
-                    } : null}
-                  />)}
+                : myOTs.map(ot => (
+                  <div key={ot.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    {isAdmin && (
+                      <input type="checkbox" checked={selectedOTs.has(ot.id)}
+                        onChange={e => {
+                          const next = new Set(selectedOTs);
+                          e.target.checked ? next.add(ot.id) : next.delete(ot.id);
+                          setSelectedOTs(next);
+                        }}
+                        style={{ width: 16, height: 16, cursor: "pointer", flexShrink: 0, accentColor: "#3b82f6" }}
+                      />
+                    )}
+                    <div style={{ flex: 1 }}>
+                      <OTRow ot={ot} equipment={equipment}
+                        onClick={() => { setSelOT(ot); setModal("otDetail"); }}
+                        onDelete={isAdmin ? async (id) => {
+                          if (!window.confirm("¿Eliminar OT " + id + "?")) return;
+                          await db.deleteOT(id);
+                          setOts(prev => prev.filter(o => o.id !== id));
+                          setSelectedOTs(prev => { const n = new Set(prev); n.delete(id); return n; });
+                          const fresh = await db.getAllReadings();
+                          setAllReadings(fresh);
+                        } : null}
+                      />
+                    </div>
+                  </div>
+                ))}
             </div>
           )}
 
