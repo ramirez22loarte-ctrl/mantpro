@@ -1059,9 +1059,26 @@ function DashboardOperativo({ allReadings, equipment }) {
 
   // Build filter options from data
   const fechas = [...new Set(allReadings.map(r => r.created_at ? new Date(r.created_at).toLocaleDateString("es-CO") : "").filter(Boolean))].sort().reverse();
-  const tags = [...new Set(equipment.map(e => e.code).filter(Boolean))].sort();
+
+  // Cascading filters
   const areas = [...new Set(equipment.map(e => e.area).filter(Boolean))].sort();
-  const subareas = [...new Set(equipment.map(e => e.subarea).filter(Boolean))].sort();
+
+  // TAGs filtered by selected area
+  const tags = [...new Set(
+    equipment
+      .filter(e => !filterArea || e.area === filterArea)
+      .map(e => e.code)
+      .filter(Boolean)
+  )].sort();
+
+  // Sub-areas filtered by selected area AND tag
+  const subareas = [...new Set(
+    equipment
+      .filter(e => !filterArea || e.area === filterArea)
+      .filter(e => !filterTag || e.code === filterTag)
+      .map(e => e.subarea)
+      .filter(Boolean)
+  )].sort();
 
   // Helper: find equipment tag from OT description or title
   // OT description format: "Tag: PPC075 | description" or title contains tag
@@ -1125,14 +1142,14 @@ function DashboardOperativo({ allReadings, equipment }) {
           </div>
           <div style={{ flex: 1, minWidth: 160 }}>
             <div style={{ fontSize: 10, color: "#475569", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>TAG / Equipo</div>
-            <select className="inp" value={filterTag} onChange={e => setFilterTag(e.target.value)}>
+            <select className="inp" value={filterTag} onChange={e => { setFilterTag(e.target.value); setFilterSubarea(""); }}>
               <option value="">Todos los TAGs</option>
               {tags.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
           <div style={{ flex: 1, minWidth: 160 }}>
             <div style={{ fontSize: 10, color: "#475569", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>Área</div>
-            <select className="inp" value={filterArea} onChange={e => setFilterArea(e.target.value)}>
+            <select className="inp" value={filterArea} onChange={e => { setFilterArea(e.target.value); setFilterTag(""); setFilterSubarea(""); }}>
               <option value="">Todas las áreas</option>
               {areas.map(a => <option key={a} value={a}>{a}</option>)}
             </select>
