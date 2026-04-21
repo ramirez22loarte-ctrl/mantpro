@@ -1691,6 +1691,14 @@ export default function App() {
                       if (!grouped[r.ot_id].readings[key]) grouped[r.ot_id].readings[key] = r.value;
                     });
 
+                    // Fetch comments BEFORE building sheets
+                    const { data: allComments } = await supabase.from("comments").select("*").order("created_at");
+                    const commentsByOT = {};
+                    (allComments || []).forEach(c => {
+                      if (!commentsByOT[c.ot_id]) commentsByOT[c.ot_id] = [];
+                      commentsByOT[c.ot_id].push(c);
+                    });
+
                     // Build sheets per discipline
                     const discParams = {
                       "Mecánico": ["Caudal (L/S)","Presión (PSI)","T° Lado Libre Motor (°C)","T° Lado Acople Motor (°C)","T° Lado Libre Bomba (°C)","T° Lado Acople Bomba (°C)","Vibración Axial Bomba (mm/s)","Vibración Axial Motor (mm/s)","Vibración Lado Libre Motor (mm/s)","Vibración Lado Acople Motor (mm/s)","Vibración Lado Libre Bomba (mm/s)","Vibración Lado Acople Bomba (mm/s)"],
@@ -1744,14 +1752,6 @@ export default function App() {
                       ws["!cols"] = [{ wch: 18 }, { wch: 14 }, ...params.map(() => ({ wch: 20 })), { wch: 18 }, { wch: 40 }, { wch: 22 }];
 
                       XLSX.utils.book_append_sheet(wb, ws, disc.substring(0, 31));
-                    });
-
-                    // Fetch comments to include in each discipline sheet
-                    const { data: allComments } = await supabase.from("comments").select("*").order("created_at");
-                    const commentsByOT = {};
-                    (allComments || []).forEach(c => {
-                      if (!commentsByOT[c.ot_id]) commentsByOT[c.ot_id] = [];
-                      commentsByOT[c.ot_id].push(c);
                     });
 
                     XLSX.writeFile(wb, "verificacion_parametros_" + new Date().toLocaleDateString("es-CO").replace(/\//g, "-") + ".xlsx");
