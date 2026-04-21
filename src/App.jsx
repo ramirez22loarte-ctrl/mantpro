@@ -1061,15 +1061,37 @@ function DashboardOperativo({ allReadings, equipment }) {
   const tags = [...new Set(equipment.map(e => e.code).filter(Boolean))].sort();
   const areas = [...new Set(equipment.map(e => e.area).filter(Boolean))].sort();
 
+  // Helper: find equipment tag from OT description or title
+  // OT description format: "Tag: PPC075 | description" or title contains tag
+  const getOTTag = (r) => {
+    const desc = r.work_orders?.description || "";
+    const title = r.work_orders?.title || "";
+    // Try to extract tag from description "Tag: XXX |"
+    const tagMatch = desc.match(/Tag:\s*([^\s|]+)/i);
+    if (tagMatch) return tagMatch[1].toUpperCase();
+    // Try to find any equipment code in the title
+    const found = equipment.find(e => e.code && (title.toUpperCase().includes(e.code.toUpperCase())));
+    return found?.code || "";
+  };
+
+  const getOTArea = (r) => {
+    const tag = getOTTag(r);
+    const eq = equipment.find(e => e.code === tag);
+    return eq?.area || "";
+  };
+
   // Filter readings
   const filtered = allReadings.filter(r => {
     const fecha = r.created_at ? new Date(r.created_at).toLocaleDateString("es-CO") : "";
-    const otTag = r.work_orders?.title || "";
-    const eq = equipment.find(e => r.work_orders?.title?.includes(e.code) || r.ot_id?.includes(e.code));
-    const eqArea = eq?.area || "";
     if (filterFecha && fecha !== filterFecha) return false;
-    if (filterTag && !(otTag.includes(filterTag) || r.ot_id?.includes(filterTag))) return false;
-    if (filterArea && eqArea !== filterArea) return false;
+    if (filterTag) {
+      const otTag = getOTTag(r);
+      if (otTag !== filterTag) return false;
+    }
+    if (filterArea) {
+      const otArea = getOTArea(r);
+      if (otArea !== filterArea) return false;
+    }
     return true;
   });
 
