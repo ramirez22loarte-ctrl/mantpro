@@ -121,6 +121,12 @@ const db = {
     return otData;
   },
   async updateOTStatus(id, status) { await supabase.from("work_orders").update({ status }).eq("id", id); },
+  async deleteOT(id) {
+    await supabase.from("readings").delete().eq("ot_id", id);
+    await supabase.from("comments").delete().eq("ot_id", id);
+    await supabase.from("parameters").delete().eq("ot_id", id);
+    await supabase.from("work_orders").delete().eq("id", id);
+  },
   async addReading(r) { const { data } = await supabase.from("readings").insert(r).select().single(); return data; },
   async addComment(c) { const { data, error } = await supabase.from("comments").insert(c).select("*").single(); if (error) console.error("addComment error:", error); return data; },
   async createUser(u) { const { data, error } = await supabase.from('users').insert(u).select().single(); return { data, error }; },
@@ -455,10 +461,10 @@ function Login({ onLogin }) {
 }
 
 // ── OT ROW ───────────────────────────────────────────────────
-function OTRow({ ot, equipment, onClick }) {
+function OTRow({ ot, equipment, onClick, onDelete }) {
   const eq = equipment.find(e => e.id === ot.equipment_id);
   return (
-    <div className="row" onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+    <div className="row" onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 12, position: "relative" }}>
       <div style={{ width: 36, height: 36, background: "#060b14", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, flexShrink: 0 }}>{D_ICON[ot.discipline]}</div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 3, flexWrap: "wrap" }}>
@@ -470,6 +476,12 @@ function OTRow({ ot, equipment, onClick }) {
         <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>{eq?.name || "—"} · Vence: {ot.due_date || "—"}</div>
       </div>
       <div style={{ fontSize: 20, flexShrink: 0 }}>{D_ICON[ot.discipline]}</div>
+      {onDelete && (
+        <button className="btn" onClick={e => { e.stopPropagation(); onDelete(ot.id); }}
+          style={{ background: "#3b0f0f", color: "#f87171", padding: "4px 10px", fontSize: 11, flexShrink: 0 }}>
+          🗑️
+        </button>
+      )}
     </div>
   );
 }
@@ -1444,7 +1456,16 @@ export default function App() {
                 </div>
               )}
               {myOTs.length === 0 ? <div style={{ textAlign: "center", color: "#334155", padding: 40 }}>No hay órdenes. {isAdmin && "Crea la primera con '+ Nueva OT'."}</div>
-                : myOTs.map(ot => <OTRow key={ot.id} ot={ot} equipment={equipment} onClick={() => { setSelOT(ot); setModal("otDetail"); }} />)}
+                : myOTs.map(ot => <OTRow key={ot.id} ot={ot} equipment={equipment}
+                    onClick={() => { setSelOT(ot); setModal("otDetail"); }}
+                    onDelete={isAdmin ? async (id) => {
+                      if (!window.confirm("¿Eliminar OT " + id + "? Se eliminarán todos los parámetros, lecturas y comentarios.")) return;
+                      await db.deleteOT(id);
+                      setOts(prev => prev.filter(o => o.id !== id));
+                      const fresh = await db.getAllReadings();
+                      setAllReadings(fresh);
+                    } : null}
+                  />)}
             </div>
           )}
 
@@ -1665,10 +1686,20 @@ export default function App() {
                         <div style={{ fontSize: 13, fontWeight: 600, color: "#f1f5f9" }}>{g.title}</div>
                         <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>{g.readings.length} lecturas registradas</div>
                       </div>
-                      <button className="btn" onClick={() => downloadOTPDF(otId, g)}
-                        style={{ background: "linear-gradient(135deg,#065f46,#0f766e)", color: "#34d399", padding: "7px 14px", fontSize: 12, flexShrink: 0 }}>
-                        📄 Descargar PDF
-                      </button>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button className="btn" onClick={() => downloadOTPDF(otId, g)}
+                          style={{ background: "linear-gradient(135deg,#065f46,#0f766e)", color: "#34d399", padding: "7px 14px", fontSize: 12 }}>
+                          📄 PDF
+                        </button>
+                        <button className="btn" onClick={async () => {
+                          if (!window.confirm("¿Eliminar todas las lecturas de la OT " + otId + "?")) return;
+                          await supabase.from("readings").delete().eq("ot_id", otId);
+                          const fresh = await db.getAllReadings();
+                          setAllReadings(fresh);
+                        }} style={{ background: "#3b0f0f", color: "#f87171", padding: "7px 12px", fontSize: 12 }}>
+                          🗑️ Eliminar
+                        </button>
+                      </div>
                     </div>
                     <div style={{ overflowX: "auto" }}>
                       <table className="ptable">
