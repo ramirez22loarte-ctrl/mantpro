@@ -261,10 +261,13 @@ function ExcelImport({ onClose, onImported }) {
 
       const disc = normalizeDisc(discRaw);
 
-      const key = otNum + "|" + disc;
+      // Use suffix to differentiate same OT number with different discipline
+      const suffix = disc === "Mecánico" ? "" : disc === "Eléctrico" ? "-E" : "-I";
+      const uniqueId = otNum + suffix;
+      const key = uniqueId;
       if (!seen.has(key)) {
         seen.add(key);
-        mapped.push({ otNum, disc, tag, desc });
+        mapped.push({ otNum: uniqueId, disc, tag, desc });
       }
     }
 
