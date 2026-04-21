@@ -1296,9 +1296,11 @@ export default function App() {
   const [modal, setModal] = useState(null);
   const [sideOpen, setSideOpen] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [filterOTDisc, setFilterOTDisc] = useState("");
 
   const isAdmin = user?.role === "admin";
-  const myOTs = isAdmin ? ots : ots.filter(o => o.assigned_to === user?.id);
+  const myOTsAll = isAdmin ? ots : ots.filter(o => o.assigned_to === user?.id);
+  const myOTs = filterOTDisc ? myOTsAll.filter(o => o.discipline === filterOTDisc) : myOTsAll;
 
   useEffect(() => {
     if (!user) return;
@@ -1419,7 +1421,7 @@ export default function App() {
               {isAdmin && (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 18 }}>
                   {DISCIPLINES.map(d => (
-                    <div key={d} className="row card" onClick={() => setPage("ots")} style={{ borderLeft: `3px solid ${D_COLOR[d]}` }}>
+                    <div key={d} className="row card" onClick={() => { setFilterOTDisc(d); handlePageChange("ots"); }} style={{ borderLeft: `3px solid ${D_COLOR[d]}` }}>
                       <div style={{ fontSize: 20, marginBottom: 6 }}>{D_ICON[d]}</div>
                       <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 13, color: "#f1f5f9" }}>{d}</div>
                       <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>{myOTs.filter(o => o.discipline === d).length} OTs · {DEFAULT_PARAMS[d].length} params/OT</div>
@@ -1434,6 +1436,13 @@ export default function App() {
 
           {page === "ots" && (
             <div className="fd" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {filterOTDisc && (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+                  <span style={{ fontSize: 13, color: D_COLOR[filterOTDisc], fontWeight: 600 }}>{filterOTDisc && D_ICON[filterOTDisc]} Filtrando: {filterOTDisc}</span>
+                  <button className="btn" onClick={() => setFilterOTDisc("")} style={{ background: "#3b0f0f", color: "#f87171", padding: "3px 10px", fontSize: 11 }}>✕ Limpiar filtro</button>
+                  <span style={{ fontSize: 11, color: "#475569" }}>{myOTs.length} de {myOTsAll.length} OTs</span>
+                </div>
+              )}
               {myOTs.length === 0 ? <div style={{ textAlign: "center", color: "#334155", padding: 40 }}>No hay órdenes. {isAdmin && "Crea la primera con '+ Nueva OT'."}</div>
                 : myOTs.map(ot => <OTRow key={ot.id} ot={ot} equipment={equipment} onClick={() => { setSelOT(ot); setModal("otDetail"); }} />)}
             </div>
