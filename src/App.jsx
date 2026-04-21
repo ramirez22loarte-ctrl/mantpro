@@ -1528,11 +1528,61 @@ export default function App() {
                   <button className="btn" onClick={() => {
                     const XLSX = window.XLSX;
                     if (!XLSX) { alert("Recarga la página"); return; }
-                    const rows = allReadings.map(r => ({ "N° OT": r.ot_id || "", "Disciplina": r.work_orders?.discipline || "", "Parámetro": r.parameters?.name || "", "Unidad": r.parameters?.unit || "", "Valor": r.value || "", "Fecha": r.created_at ? new Date(r.created_at).toLocaleString("es-CO") : "" }));
-                    const ws = XLSX.utils.json_to_sheet(rows);
                     const wb = XLSX.utils.book_new();
-                    XLSX.utils.book_append_sheet(wb, ws, "Lecturas");
-                    XLSX.writeFile(wb, "verificacion_" + new Date().toLocaleDateString("es-CO").replace(/\//g, "-") + ".xlsx");
+
+                    // Group readings by OT and discipline
+                    const grouped = {};
+                    allReadings.forEach(r => {
+                      if (!grouped[r.ot_id]) grouped[r.ot_id] = { disc: r.work_orders?.discipline || "", readings: {} };
+                      const pName = r.parameters?.name || "";
+                      const pUnit = r.parameters?.unit || "";
+                      const key = pName + (pUnit ? " (" + pUnit + ")" : "");
+                      if (!grouped[r.ot_id].readings[key]) grouped[r.ot_id].readings[key] = r.value;
+                    });
+
+                    // Build sheets per discipline
+                    const discParams = {
+                      "Mecánico": ["Caudal (L/S)","Presión (PSI)","T° Lado Libre Motor (°C)","T° Lado Acople Motor (°C)","T° Lado Libre Bomba (°C)","T° Lado Acople Bomba (°C)","Vibración Axial Bomba (mm/s)","Vibración Axial Motor (mm/s)","Vibración Lado Libre Motor (mm/s)","Vibración Lado Acople Motor (mm/s)","Vibración Lado Libre Bomba (mm/s)","Vibración Lado Acople Bomba (mm/s)"],
+                      "Eléctrico": ["Corriente Fase I (A)","Corriente Fase II (A)","Corriente Fase III (A)","Voltaje 1-2 (V)","Voltaje 2-3 (V)","Voltaje 1-3 (V)","Frecuencia (Hz)","Potencia (W)","Horómetro (hrs)","Corriente Nominal Motor (A)"],
+                      "Instrumentación": ["RTD01 (°C)","RTD02 (°C)","RTD03 (°C)","RTD04 (°C)","RTD05 (°C)","RTD06 (°C)","RTD07 (°C)","RTD08 (°C)"]
+                    };
+
+                    ["Mecánico","Eléctrico","Instrumentación"].forEach(disc => {
+                      const params = discParams[disc];
+                      const otRows = Object.entries(grouped).filter(([,g]) => g.disc === disc);
+                      if (otRows.length === 0) return;
+
+                      // Build worksheet data array
+                      const wsData = [];
+
+                      // Row 1: Headers group title
+                      const headerRow1 = ["N° OT", "Disciplina", ...params.map((_,i) => i === 0 ? "PARAMETROS " + disc.toUpperCase() : "")];
+                      wsData.push(headerRow1);
+
+                      // Row 2: Column headers
+                      const headerRow2 = ["N° OT", "Disciplina", ...params];
+                      wsData.push(headerRow2);
+
+                      // Data rows
+                      otRows.forEach(([otId, g]) => {
+                        const row = [otId, g.disc];
+                        params.forEach(p => row.push(g.readings[p] || ""));
+                        wsData.push(row);
+                      });
+
+                      const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+                      // Merge cells for group title
+                      if (!ws["!merges"]) ws["!merges"] = [];
+                      ws["!merges"].push({ s: { r: 0, c: 2 }, e: { r: 0, c: params.length + 1 } });
+
+                      // Column widths
+                      ws["!cols"] = [{ wch: 18 }, { wch: 14 }, ...params.map(() => ({ wch: 22 }))];
+
+                      XLSX.utils.book_append_sheet(wb, ws, disc.substring(0, 31));
+                    });
+
+                    XLSX.writeFile(wb, "verificacion_parametros_" + new Date().toLocaleDateString("es-CO").replace(/\//g, "-") + ".xlsx");
                   }} style={{ background: "#0f2040", color: "#60a5fa", padding: "8px 14px", fontSize: 13 }}>
                     📊 Exportar Todo a Excel
                   </button>
