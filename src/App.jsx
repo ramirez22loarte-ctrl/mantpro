@@ -108,7 +108,7 @@ const db = {
   },
   async getParams(otId) { const { data } = await supabase.from("parameters").select("*").eq("ot_id", otId).order("sort_order"); return data || []; },
   async getReadings(otId) { const { data } = await supabase.from("readings").select("*, parameters(name, unit, sort_order)").eq("ot_id", otId).order("created_at"); return data || []; },
-  async getComments(otId) { const { data } = await supabase.from("comments").select("*, users(name, role, discipline)").eq("ot_id", otId).order("created_at"); return data || []; },
+  async getComments(otId) { const { data } = await supabase.from("comments").select("*").eq("ot_id", otId).order("created_at"); return data || []; },
   async getAllReadings() { const { data } = await supabase.from("readings").select("*, parameters(name, unit, sort_order), work_orders(id, discipline, title, status)").order("created_at", { ascending: false }); return data || []; },
   async createLocation(loc) { const { data } = await supabase.from("locations").insert(loc).select().single(); return data; },
   async createEquipment(eq) { const { data } = await supabase.from("equipment").insert(eq).select().single(); return data; },
@@ -122,7 +122,7 @@ const db = {
   },
   async updateOTStatus(id, status) { await supabase.from("work_orders").update({ status }).eq("id", id); },
   async addReading(r) { const { data } = await supabase.from("readings").insert(r).select().single(); return data; },
-  async addComment(c) { const { data } = await supabase.from("comments").insert(c).select("*, users(name, role, discipline)").single(); return data; },
+  async addComment(c) { const { data, error } = await supabase.from("comments").insert(c).select("*").single(); if (error) console.error("addComment error:", error); return data; },
   async createUser(u) { const { data, error } = await supabase.from('users').insert(u).select().single(); return { data, error }; },
   async createOTsBulk(ots, params) {
     const results = [];
@@ -536,7 +536,7 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
   // Guarda automáticamente el comentario en borrador
   const autoSaveComment = async () => {
     if (!comment.trim()) return;
-    const c = await db.addComment({ ot_id: ot.id, user_id: user.id, text: comment });
+    const c = await db.addComment({ ot_id: ot.id, author: user.name, role: user.role === "admin" ? "Administrador" : "Técnico", discipline: user.discipline || ot.discipline, text: comment });
     if (c) setComments(prev => [...prev, c]);
     setComment("");
   };
@@ -550,7 +550,7 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
 
   const postComment = async () => {
     if (!comment.trim()) return;
-    const c = await db.addComment({ ot_id: ot.id, user_id: user.id, text: comment });
+    const c = await db.addComment({ ot_id: ot.id, author: user.name, role: user.role === "admin" ? "Administrador" : "Técnico", discipline: user.discipline || ot.discipline, text: comment });
     if (c) setComments(prev => [...prev, c]);
     setComment("");
   };
@@ -574,7 +574,7 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
     // 2. Guardar comentario pendiente (si hay texto sin guardar)
     const pendingComment = comment.trim();
     if (pendingComment) {
-      await db.addComment({ ot_id: ot.id, user_id: user.id, text: pendingComment });
+      await db.addComment({ ot_id: ot.id, author: user.name, role: user.role === "admin" ? "Administrador" : "Técnico", discipline: user.discipline || ot.discipline, text: pendingComment });
       setComment("");
     }
     // 3. Cerrar OT
@@ -593,7 +593,7 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
       return "<tr><td style='padding:8px 12px;border-bottom:1px solid #eee;font-weight:500'>" + p.name + " (" + p.unit + ")</td><td style='padding:8px 12px;border-bottom:1px solid #eee;color:" + (lastR ? "#065f46" : "#999") + ";font-weight:700'>" + (lastR ? lastR.value + " " + p.unit : "Sin datos") + "</td><td style='padding:8px 12px;border-bottom:1px solid #eee;color:#666;font-size:11px'>" + (lastR ? new Date(lastR.created_at).toLocaleString("es-CO") : "—") + "</td></tr>";
     }).join("");
 
-    const commentRows = allC.length > 0 ? allC.map(c => "<tr><td style='padding:8px 12px;border-bottom:1px solid #eee;color:#666;font-size:11px'>" + (c.created_at ? new Date(c.created_at).toLocaleString("es-CO") : "—") + "</td><td style='padding:8px 12px;border-bottom:1px solid #eee;font-weight:500'>" + (c.users?.name || user.name || "Técnico") + "</td><td style='padding:8px 12px;border-bottom:1px solid #eee'>" + (c.text || "") + "</td></tr>").join("") : "";
+    const commentRows = allC.length > 0 ? allC.map(c => "<tr><td style='padding:8px 12px;border-bottom:1px solid #eee;color:#666;font-size:11px'>" + (c.created_at ? new Date(c.created_at).toLocaleString("es-CO") : "—") + "</td><td style='padding:8px 12px;border-bottom:1px solid #eee;font-weight:500'>" + (c.author || "Técnico") + "</td><td style='padding:8px 12px;border-bottom:1px solid #eee'>" + (c.text || "") + "</td></tr>").join("") : "";
 
     printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>OT ${ot.id}</title><style>
       body{font-family:Arial,sans-serif;margin:30px;color:#111}
@@ -744,11 +744,11 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
               ? <div style={{ color: "#334155", textAlign: "center", padding: 20, fontSize: 13 }}>Sin comentarios aún.</div>
               : <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
                 {comments.map(c => (
-                  <div key={c.id} style={{ background: "#060b14", borderRadius: 8, padding: "10px 13px", borderLeft: `3px solid ${c.users?.discipline ? D_COLOR[c.users.discipline] : "#3b82f6"}` }}>
+                  <div key={c.id} style={{ background: "#060b14", borderRadius: 8, padding: "10px 13px", borderLeft: `3px solid ${D_COLOR[c.discipline] || "#3b82f6"}` }}>
                     <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 5, flexWrap: "wrap" }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: "#f1f5f9" }}>{c.users?.name}</span>
-                      <span style={{ fontSize: 10, color: "#475569" }}>{c.users?.role === "admin" ? "Admin" : `Téc. ${c.users?.discipline}`}</span>
-                      <span style={{ fontSize: 10, color: "#334155", marginLeft: "auto" }}>{new Date(c.created_at).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" })}</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: "#f1f5f9" }}>{c.author || "Técnico"}</span>
+                      <span style={{ fontSize: 10, color: "#475569" }}>{c.role || ""}{c.discipline ? " · " + c.discipline : ""}</span>
+                      <span style={{ fontSize: 10, color: "#334155", marginLeft: "auto" }}>{c.created_at ? new Date(c.created_at).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" }) : "—"}</span>
                     </div>
                     <p style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.5 }}>{c.text}</p>
                   </div>
