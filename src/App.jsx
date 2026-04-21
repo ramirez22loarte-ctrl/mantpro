@@ -1676,7 +1676,7 @@ export default function App() {
                     <div style={{ fontFamily: "Syne,sans-serif", fontSize: 15, fontWeight: 700, color: "#f1f5f9" }}>Verificación de Información Ingresada</div>
                     <div style={{ fontSize: 12, color: "#64748b", marginTop: 3 }}>{otList.length} OTs con lecturas · {allReadings.length} lecturas totales</div>
                   </div>
-                  <button className="btn" onClick={() => {
+                  <button className="btn" onClick={async () => {
                     const XLSX = window.XLSX;
                     if (!XLSX) { alert("Recarga la página"); return; }
                     const wb = XLSX.utils.book_new();
@@ -1732,6 +1732,28 @@ export default function App() {
 
                       XLSX.utils.book_append_sheet(wb, ws, disc.substring(0, 31));
                     });
+
+                    // Add Comentarios sheet - fetch comments from grouped data
+                    // Comments are already loaded in the otList variable via allReadings
+                    // We need to get comments separately - use supabase directly
+                    const { data: allComments } = await supabase.from("comments").select("*").order("created_at");
+                    if (allComments && allComments.length > 0) {
+                      const commWsData = [
+                        ["N° OT", "Técnico", "Disciplina", "Comentario", "Fecha"]
+                      ];
+                      allComments.forEach(c => {
+                        commWsData.push([
+                          c.ot_id || "",
+                          c.author || "",
+                          c.discipline || "",
+                          c.text || "",
+                          c.created_at ? new Date(c.created_at).toLocaleString("es-CO") : ""
+                        ]);
+                      });
+                      const commWs = XLSX.utils.aoa_to_sheet(commWsData);
+                      commWs["!cols"] = [{ wch: 18 }, { wch: 20 }, { wch: 16 }, { wch: 50 }, { wch: 22 }];
+                      XLSX.utils.book_append_sheet(wb, commWs, "Comentarios");
+                    }
 
                     XLSX.writeFile(wb, "verificacion_parametros_" + new Date().toLocaleDateString("es-CO").replace(/\//g, "-") + ".xlsx");
                   }} style={{ background: "#0f2040", color: "#60a5fa", padding: "8px 14px", fontSize: 13 }}>
