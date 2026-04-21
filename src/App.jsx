@@ -221,7 +221,15 @@ function ExcelImport({ onClose, onImported }) {
     // C(2) = Tag, E(4) = N° OT, G(6) = Disciplina, H(7) = Descripción
     const ref = XLSX.utils.decode_range(ws["!ref"] || "A1:Z1000");
     const maxRow = ref.e.r;
-    const DATA_START_ROW = 12; // fila 13 en base 0
+    // Auto-detect start row: find first row where col E has a 7-10 digit number
+    let DATA_START_ROW = 12;
+    for (let r = 8; r <= Math.min(maxRow, 20); r++) {
+      const cell = ws[XLSX.utils.encode_cell({ r, c: 4 })];
+      if (cell && /^\d{7,12}$/.test(String(cell.v || "").trim())) {
+        DATA_START_ROW = r;
+        break;
+      }
+    }
 
     const mapped = [];
     const seen = new Set();
@@ -273,9 +281,13 @@ function ExcelImport({ onClose, onImported }) {
     if (!preview.length) return;
     setLoading(true);
     setStatus("Importando OTs...");
-    let ok = 0, fail = 0, errMsg = "";
+    let ok = 0, skip = 0, fail = 0, errMsg = "";
     for (const row of preview) {
       const id = row.otNum;
+      // Check if OT already exists
+      const { data: existing } = await supabase.from("work_orders").select("id").eq("id", id).single();
+      if (existing) { skip++; setStatus("Importando... " + (ok + skip + fail) + "/" + preview.length); continue; }
+
       const ot = {
         id,
         title: row.desc || ("OT " + id),
@@ -301,11 +313,11 @@ function ExcelImport({ onClose, onImported }) {
         fail++;
         if (error && !errMsg) errMsg = error.message;
       }
-      setStatus("Importando... " + (ok + fail) + "/" + preview.length);
+      setStatus("Importando... " + (ok + skip + fail) + "/" + preview.length);
     }
     setLoading(false);
     setDone(true);
-    setStatus("✅ " + ok + " OTs importadas. " + (fail > 0 ? "⚠️ " + fail + " fallaron: " + errMsg : ""));
+    setStatus("✅ " + ok + " OTs importadas. " + (skip > 0 ? skip + " ya existían (omitidas). " : "") + (fail > 0 ? "⚠️ " + fail + " fallaron: " + errMsg : ""));
     onImported();
   };
 
