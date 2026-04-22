@@ -1190,14 +1190,19 @@ function DashboardOperativo({ allReadings, equipment }) {
   // Build filter options from data
   const fechas = [...new Set(allReadings.map(r => r.created_at ? new Date(r.created_at).toLocaleDateString("es-CO") : "").filter(Boolean))].sort().reverse();
 
-  // Build OT info index once (avoid calling getOTTag per reading which is slow)
+  // Build OT info index once per allReadings change
   const otInfoIndex = useMemo(() => {
     const idx = {};
+    // Get unique OTs only
+    const uniqueOTs = {};
     allReadings.forEach(r => {
-      if (!r.ot_id || idx[r.ot_id]) return;
-      const desc = r.work_orders?.description || "";
-      const oldMatch = desc.match(/^Tag:\s*([^|\s]+)/i);
+      if (r.ot_id && !uniqueOTs[r.ot_id]) uniqueOTs[r.ot_id] = r.work_orders;
+    });
+    Object.entries(uniqueOTs).forEach(([otId, wo]) => {
+      const desc = (wo?.description || "");
       let tag = "", area = "", subarea = "";
+      // Format: "TAG|AREA|SUBAREA|..." or "Tag: TAG | ..."
+      const oldMatch = desc.match(/^Tag:\s*([^|\s]+)/i);
       if (oldMatch) {
         tag = oldMatch[1].trim().toUpperCase();
       } else {
@@ -1206,15 +1211,29 @@ function DashboardOperativo({ allReadings, equipment }) {
         area = parts[1]?.trim() || "";
         subarea = parts[2]?.trim() || "";
       }
-      if (!area) { const eq = equipment.find(e => e.code && e.code.toUpperCase() === tag); area = eq?.area || ""; subarea = eq?.subarea || ""; }
-      idx[r.ot_id] = { tag, area, subarea };
+      // Fallback to equipment table for area/subarea
+      if (!area && tag) {
+        const eq = equipment.find(e => e.code && e.code.toUpperCase() === tag);
+        area = eq?.area || "";
+        subarea = eq?.subarea || "";
+      }
+      idx[otId] = { tag, area, subarea };
     });
     return idx;
   }, [allReadings, equipment]);
 
   const areas = [...new Set(Object.values(otInfoIndex).map(o => o.area).filter(Boolean))].sort();
-  const tags = [...new Set(Object.values(otInfoIndex).filter(o => !filterArea || o.area === filterArea).map(o => o.tag).filter(Boolean))].sort();
-  const subareas = [...new Set(Object.values(otInfoIndex).filter(o => !filterArea || o.area === filterArea).filter(o => !filterTag || o.tag === filterTag).map(o => o.subarea).filter(Boolean))].sort();
+  const tags = [...new Set(
+    Object.values(otInfoIndex)
+      .filter(o => !filterArea || o.area === filterArea)
+      .map(o => o.tag).filter(Boolean)
+  )].sort();
+  const subareas = [...new Set(
+    Object.values(otInfoIndex)
+      .filter(o => !filterArea || o.area === filterArea)
+      .filter(o => !filterTag || o.tag === filterTag)
+      .map(o => o.subarea).filter(Boolean)
+  )].sort();
 
   // Helper: extract TAG from OT description
   // Formats: "PPZ402|AREA|SUBAREA|DESC" or "Tag: PPZ402 | DESC"
