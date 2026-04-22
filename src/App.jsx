@@ -404,9 +404,30 @@ function TechOTSearch({ user, onFound, onClose }) {
   const search = async () => {
     if (!otNum.trim()) return;
     setLoading(true); setErr("");
-    const { data } = await supabase.from("work_orders").select("*").eq("id", otNum.trim()).single();
-    if (data) onFound(data);
-    else setErr("No se encontró la OT. Verifica el número.");
+    const num = otNum.trim();
+    const disc = user.discipline || "Mecánico";
+
+    // Build possible IDs based on discipline
+    const suffix = disc === "Mecánico" ? "" : disc === "Eléctrico" ? "-E" : "-I";
+    const ids = [num + suffix, num]; // try with suffix first, then plain
+
+    let found = null;
+    for (const id of ids) {
+      const { data } = await supabase.from("work_orders").select("*").eq("id", id).single();
+      if (data && data.discipline === disc) { found = data; break; }
+      if (data && ids.length === 1) { found = data; break; }
+    }
+
+    // If not found with suffix, try searching by discipline
+    if (!found) {
+      const { data: rows } = await supabase.from("work_orders").select("*")
+        .eq("discipline", disc)
+        .or("id.eq." + num + ",id.eq." + num + suffix);
+      if (rows && rows.length > 0) found = rows[0];
+    }
+
+    if (found) onFound(found);
+    else setErr("No se encontró la OT " + num + " para disciplina " + disc + ".");
     setLoading(false);
   };
 
@@ -418,6 +439,9 @@ function TechOTSearch({ user, onFound, onClose }) {
             <div style={{ fontSize: 32, marginBottom: 6 }}>🔍</div>
             <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 17, color: "#f1f5f9" }}>Buscar Orden de Trabajo</div>
             <div style={{ fontSize: 12, color: "#475569", marginTop: 4 }}>Ingresa el número de tu OT</div>
+          <div style={{ fontSize: 11, color: D_COLOR[user.discipline] || "#64748b", marginTop: 6, fontWeight: 600 }}>
+            {D_ICON[user.discipline]} Buscando en: {user.discipline}
+          </div>
           </div>
           <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "5px 11px", alignSelf: "flex-start" }}>✕</button>
         </div>
