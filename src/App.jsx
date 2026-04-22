@@ -623,6 +623,7 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
     // Re-fetch params to get current IDs
     const allP = await db.getParams(ot.id);
 
+    if (!isAdmin) { setSaving(false); onClose(); return; }
     const printWindow = window.open("", "_blank");
     const paramRows = allP.map(p => {
       const rs = allR.filter(r => r.parameter_id === p.id);
@@ -713,6 +714,14 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
 
         {tab === "params" && (
           <div>
+            {!isAdmin && status === "Cerrada" ? (
+              <div style={{ textAlign: "center", padding: "40px 20px" }}>
+                <div style={{ fontSize: 40, marginBottom: 16 }}>✅</div>
+                <div style={{ fontFamily: "Syne,sans-serif", fontSize: 18, fontWeight: 700, color: "#a78bfa", marginBottom: 8 }}>Orden de Trabajo Cerrada</div>
+                <div style={{ fontSize: 13, color: "#475569" }}>Esta OT fue cerrada. Los datos ya fueron registrados.</div>
+              </div>
+            ) : (
+            <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
               <div style={{ fontSize: 12, color: D_COLOR[ot.discipline], fontWeight: 600 }}>
                 {D_ICON[ot.discipline]} Parámetros {ot.discipline} — {params.length} campos
@@ -772,6 +781,8 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
                 </tbody>
               </table>
             </div>
+            </div>
+            )}
           </div>
         )}
 
@@ -792,11 +803,17 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
                 ))}
               </div>}
             <div style={{ borderTop: "1px solid #14213a", paddingTop: 12 }}>
-              <textarea className="inp" rows={3} placeholder="Escribe una novedad técnica... (se guarda al cambiar de pestaña o al Cerrar OT)" value={comment} onChange={e => setComment(e.target.value)} style={{ resize: "vertical", marginBottom: 8 }} />
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <button className="btn" onClick={postComment} disabled={!comment.trim()} style={{ background: "#0f2040", color: "#60a5fa", padding: "7px 14px", fontSize: 12 }}>+ Agregar ahora</button>
-                <div style={{ fontSize: 11, color: "#334155", fontStyle: "italic" }}>💡 También se guarda automáticamente al cerrar la OT</div>
-              </div>
+              {(!isAdmin && status === "Cerrada") ? (
+                <div style={{ fontSize: 12, color: "#475569", fontStyle: "italic", padding: "10px 0" }}>Esta OT está cerrada. No se pueden agregar más comentarios.</div>
+              ) : (
+                <>
+                  <textarea className="inp" rows={3} placeholder="Escribe una novedad técnica... (se guarda al cambiar de pestaña o al Cerrar OT)" value={comment} onChange={e => setComment(e.target.value)} style={{ resize: "vertical", marginBottom: 8 }} />
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <button className="btn" onClick={postComment} disabled={!comment.trim()} style={{ background: "#0f2040", color: "#60a5fa", padding: "7px 14px", fontSize: 12 }}>+ Agregar ahora</button>
+                    <div style={{ fontSize: 11, color: "#334155", fontStyle: "italic" }}>💡 También se guarda automáticamente al cerrar la OT</div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
