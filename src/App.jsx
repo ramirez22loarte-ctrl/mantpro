@@ -1451,6 +1451,178 @@ function EditEquip({ eq, onClose, onSave }) {
   );
 }
 
+
+// ── IMPORT HISTÓRICO ──────────────────────────────────────────
+function ImportHistorico({ equipment }) {
+  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState("");
+  const [done, setDone] = useState(false);
+  const [progress, setProgress] = useState({ ok: 0, skip: 0, total: 0 });
+  const fileRef = useRef();
+
+  const PARAM_COL_MAP = [
+    { col: 7,  name: "Caudal",                    unit: "L/S",   disc: "Mecánico"  },
+    { col: 8,  name: "Presión",                   unit: "PSI",   disc: "Mecánico"  },
+    { col: 11, name: "T° Lado Libre Motor",        unit: "°C",    disc: "Mecánico"  },
+    { col: 12, name: "T° Lado Acople Motor",       unit: "°C",    disc: "Mecánico"  },
+    { col: 13, name: "T° Lado Libre Bomba",        unit: "°C",    disc: "Mecánico"  },
+    { col: 14, name: "T° Lado Acople Bomba",       unit: "°C",    disc: "Mecánico"  },
+    { col: 15, name: "Vibración Axial Bomba",      unit: "mm/s",  disc: "Mecánico"  },
+    { col: 16, name: "Vibración Axial Motor",      unit: "mm/s",  disc: "Mecánico"  },
+    { col: 17, name: "Vibración Lado Libre Motor", unit: "mm/s",  disc: "Mecánico"  },
+    { col: 18, name: "Vibración Lado Acople Motor",unit: "mm/s",  disc: "Mecánico"  },
+    { col: 19, name: "Vibración Lado Libre Bomba", unit: "mm/s",  disc: "Mecánico"  },
+    { col: 20, name: "Vibración Lado Acople Bomba",unit: "mm/s",  disc: "Mecánico"  },
+    { col: 21, name: "Corriente Fase I",           unit: "A",     disc: "Eléctrico" },
+    { col: 22, name: "Corriente Fase II",          unit: "A",     disc: "Eléctrico" },
+    { col: 23, name: "Corriente Fase III",         unit: "A",     disc: "Eléctrico" },
+    { col: 24, name: "Voltaje 1-2",                unit: "V",     disc: "Eléctrico" },
+    { col: 25, name: "Voltaje 2-3",                unit: "V",     disc: "Eléctrico" },
+    { col: 26, name: "Voltaje 1-3",                unit: "V",     disc: "Eléctrico" },
+    { col: 27, name: "Frecuencia",                 unit: "Hz",    disc: "Eléctrico" },
+    { col: 28, name: "Potencia",                   unit: "W",     disc: "Eléctrico" },
+  ];
+
+  const processFile = async (f) => {
+    setLoading(true); setDone(false);
+    setStatus("Leyendo Excel histórico...");
+    try {
+      const buf = await f.arrayBuffer();
+      const XLSX = window.XLSX;
+      if (!XLSX) { setStatus("⚠️ Recarga la página."); setLoading(false); return; }
+      const wb = XLSX.read(new Uint8Array(buf), { type: "array" });
+
+      // Find "PARAMETROS GENERALES" sheet
+      const sheetName = wb.SheetNames.find(s => s.toUpperCase().includes("PARAMETROS GENERALES")) || wb.SheetNames[0];
+      const ws = wb.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: null, header: 1 });
+
+      // Row 0 = headers, Row 1+ = data
+      // Cols: 0=AREA, 1=SUBAREA, 2=TAG, 3=AÑO, 4=MES, 5=FECHA, 6=N°OT, 7+=params
+      setStatus("Procesando " + (rows.length - 1) + " registros...");
+
+      let ok = 0, skip = 0;
+      const total = rows.length - 1;
+      setProgress({ ok: 0, skip: 0, total });
+
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row || !row[6]) { skip++; continue; }
+
+        const tag = String(row[2] || "").trim().toUpperCase();
+        const otNum = String(row[6]).trim().replace(".0", "");
+        const fecha = row[5] ? String(row[5]).substring(0, 10) : new Date().toISOString().split("T")[0];
+
+        // Find equipment by TAG
+        const eq = equipment.find(e => e.code && e.code.toUpperCase() === tag);
+
+        // Process each discipline's params for this row
+        const discGroups = {};
+        for (const pm of PARAM_COL_MAP) {
+          const val = row[pm.col];
+          if (val === null || val === undefined || String(val).trim() === "-" || String(val).trim() === "") continue;
+          const numVal = parseFloat(val);
+          if (isNaN(numVal) || numVal === 0) continue;
+          if (!discGroups[pm.disc]) discGroups[pm.disc] = [];
+          discGroups[pm.disc].push({ name: pm.name, unit: pm.unit, value: String(numVal) });
+        }
+
+        for (const [disc, params] of Object.entries(discGroups)) {
+          const suffix = disc === "Mecánico" ? "" : disc === "Eléctrico" ? "-E" : "-I";
+          const otId = otNum + suffix;
+
+          // Create OT if not exists
+          const { data: existing } = await supabase.from("work_orders").select("id").eq("id", otId).single();
+          if (!existing) {
+            await supabase.from("work_orders").insert({
+              id: otId,
+              title: "HIST " + disc.substring(0,3).toUpperCase() + " " + tag,
+              discipline: disc,
+              priority: "Media",
+              status: "Cerrada",
+              description: tag + "|||Histórico",
+              created_at: fecha,
+              equipment_id: eq?.id || null,
+              location_id: null, assigned_to: null, job_instruction_id: null, due_date: null
+            });
+          }
+
+          // For each param, ensure parameter exists then insert reading
+          for (const p of params) {
+            let { data: param } = await supabase.from("parameters").select("id").eq("ot_id", otId).eq("name", p.name).single();
+            if (!param) {
+              const { data: newP } = await supabase.from("parameters").insert({ ot_id: otId, name: p.name, unit: p.unit, expected: "", sort_order: 0 }).select().single();
+              param = newP;
+            }
+            if (param) {
+              await supabase.from("readings").insert({ ot_id: otId, parameter_id: param.id, value: p.value, created_at: fecha + " 12:00:00" });
+            }
+          }
+          ok++;
+        }
+
+        if (i % 20 === 0) {
+          setProgress({ ok, skip, total });
+          setStatus("Importando... " + i + " de " + total + " filas");
+        }
+      }
+
+      setProgress({ ok, skip, total });
+      setDone(true);
+      setStatus("✅ Importación completa. " + ok + " grupos importados.");
+    } catch(e) {
+      setStatus("⚠️ Error: " + e.message);
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="fd">
+      <div style={{ fontFamily: "Syne,sans-serif", fontSize: 15, fontWeight: 700, color: "#f1f5f9", marginBottom: 6 }}>📥 Importar Parámetros Históricos</div>
+      <div style={{ fontSize: 12, color: "#475569", marginBottom: 18 }}>
+        Carga el Excel <strong style={{ color: "#60a5fa" }}>PARAMETROS GENERALES</strong> con datos históricos. El sistema buscará cada TAG en Equipos y cargará las lecturas en el Dashboard Operativo.
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 11, color: "#64748b", marginBottom: 10, fontWeight: 600, textTransform: "uppercase" }}>Estructura esperada del Excel:</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px,1fr))", gap: 8 }}>
+          {["AREA (Col A)","SUBAREA (Col B)","TAG (Col C)","FECHA (Col F)","N° OT (Col G)","Parámetros Mecánicos (H-U)","Parámetros Eléctricos (V-AC)"].map(c => (
+            <div key={c} style={{ background: "#060b14", borderRadius: 6, padding: "6px 10px", fontSize: 11, color: "#94a3b8" }}>{c}</div>
+          ))}
+        </div>
+      </div>
+
+      <div onClick={() => !loading && fileRef.current?.click()}
+        onDragOver={e => e.preventDefault()}
+        onDrop={e => { e.preventDefault(); if (!loading) { const f = e.dataTransfer.files[0]; if (f) processFile(f); } }}
+        style={{ border: "2px dashed #1a2740", borderRadius: 10, padding: 32, textAlign: "center", cursor: loading ? "not-allowed" : "pointer", background: "#060b14", marginBottom: 14 }}>
+        <div style={{ fontSize: 36, marginBottom: 10 }}>📊</div>
+        <div style={{ fontSize: 14, color: "#64748b" }}>{loading ? "Importando, por favor espera..." : "Arrastra o haz clic para seleccionar el Excel histórico"}</div>
+        <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: "none" }} onChange={e => { const f = e.target.files[0]; if (f) processFile(f); }} />
+      </div>
+
+      {loading && (
+        <div className="card">
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+            <div className="spin" />
+            <div style={{ fontSize: 13, color: "#60a5fa" }}>{status}</div>
+          </div>
+          <div style={{ background: "#060b14", borderRadius: 6, height: 6, overflow: "hidden" }}>
+            <div style={{ height: "100%", background: "linear-gradient(90deg,#3b82f6,#7c3aed)", width: progress.total ? (((progress.ok + progress.skip) / progress.total) * 100) + "%" : "0%", transition: "width .3s" }} />
+          </div>
+          <div style={{ fontSize: 11, color: "#475569", marginTop: 6 }}>{progress.ok + progress.skip} de {progress.total} registros procesados</div>
+        </div>
+      )}
+
+      {!loading && status && (
+        <div style={{ padding: "12px 16px", background: done ? "#0a2a1a" : "#1a0a0a", borderRadius: 8, border: "1px solid " + (done ? "#065f46" : "#7f1d1d") }}>
+          <div style={{ fontSize: 13, color: done ? "#34d399" : "#f87171" }}>{status}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [locations, setLocations] = useState([]);
@@ -1523,6 +1695,7 @@ export default function App() {
     { k: "kpi", i: "📈", l: "Indicadores KPI" },
     { k: "dashboard_op", i: "📡", l: "Dashboard Operativo" },
     { k: "verificacion", i: "✅", l: "Verificación" },
+    { k: "historico", i: "📥", l: "Importar Histórico" },
     { k: "users", i: "👥", l: "Usuarios" },
   ];
   const TECH_NAV = [
@@ -1780,6 +1953,7 @@ export default function App() {
           )}
 
           {page === "dashboard_op" && isAdmin && <DashboardOperativo allReadings={allReadings} equipment={equipment} />}
+          {page === "historico" && isAdmin && <ImportHistorico equipment={equipment} />}
 
           {page === "verificacion" && isAdmin && (() => {
             // Group readings by OT
