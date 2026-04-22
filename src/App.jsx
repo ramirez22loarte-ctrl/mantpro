@@ -1507,7 +1507,17 @@ function ImportHistorico({ equipment }) {
         if (!row || !row[6] || row[6] === null) continue;
         const tag = String(row[2] || "").trim().toUpperCase();
         const otNum = row[6] ? String(Math.round(Number(row[6]))) : null;
-        const fecha = row[5] ? String(row[5]).substring(0, 10) : "2025-01-01";
+        let fecha = "2025-01-01";
+        if (row[5]) {
+          const d = row[5];
+          if (typeof d === "string") fecha = d.substring(0, 10);
+          else if (d instanceof Date) fecha = d.toISOString().substring(0, 10);
+          else if (typeof d === "number") {
+            // Excel serial date
+            const jsDate = new Date((d - 25569) * 86400 * 1000);
+            fecha = jsDate.toISOString().substring(0, 10);
+          }
+        }
         const eq = equipment.find(e => e.code && e.code.toUpperCase() === tag);
 
         const discGroups = {};
@@ -1544,40 +1554,48 @@ function ImportHistorico({ equipment }) {
         setStatus("OTs: " + Math.min(i + BATCH, otIds.length) + " de " + otIds.length);
       }
 
-      // STEP 3: Bulk insert parameters (batch of 500)
-      setStatus("Insertando parámetros en lote...");
-      const allParams = [];
-      for (const otId of otIds) {
-        for (const [name, p] of Object.entries(otMap[otId].params)) {
-          allParams.push({ ot_id: otId, name, unit: p.unit, expected: "", sort_order: 0 });
-        }
-      }
-      for (let i = 0; i < allParams.length; i += 500) {
-        await supabase.from("parameters").upsert(allParams.slice(i, i + 500), { onConflict: "ot_id,name", ignoreDuplicates: true });
-        setStatus("Parámetros: " + Math.min(i + 500, allParams.length) + " de " + allParams.length);
-      }
+      // STEP 3-5: Process in batches of 50 OTs to avoid query limits
+      setStatus("Insertando parámetros y lecturas...");
+      const PBATCH = 50;
+      let totalReadings = 0;
+      for (let i = 0; i < otIds.length; i += PBATCH) {
+        const batchIds = otIds.slice(i, i + PBATCH);
 
-      // STEP 4: Fetch all created parameter IDs in bulk
-      setStatus("Obteniendo IDs de parámetros...");
-      const { data: paramRows } = await supabase.from("parameters").select("id, ot_id, name").in("ot_id", otIds);
-      const paramIndex = {};
-      (paramRows || []).forEach(p => { paramIndex[p.ot_id + "|" + p.name] = p.id; });
-
-      // STEP 5: Bulk insert readings (batch of 500)
-      setStatus("Insertando lecturas en lote...");
-      const allReadings = [];
-      for (const otId of otIds) {
-        const g = otMap[otId];
-        for (const [name, p] of Object.entries(g.params)) {
-          const paramId = paramIndex[otId + "|" + name];
-          if (paramId) allReadings.push({ ot_id: otId, parameter_id: paramId, value: p.value, created_at: g.fecha + " 12:00:00" });
+        // Insert parameters for this batch
+        const batchParams = [];
+        for (const otId of batchIds) {
+          for (const [name, p] of Object.entries(otMap[otId].params)) {
+            batchParams.push({ ot_id: otId, name, unit: p.unit, expected: "", sort_order: 0 });
+          }
         }
+        if (batchParams.length > 0) {
+          await supabase.from("parameters").upsert(batchParams, { onConflict: "ot_id,name", ignoreDuplicates: true });
+        }
+
+        // Fetch parameter IDs for this batch
+        const { data: paramRows } = await supabase.from("parameters").select("id, ot_id, name").in("ot_id", batchIds);
+        const paramIndex = {};
+        (paramRows || []).forEach(p => { paramIndex[p.ot_id + "|" + p.name] = p.id; });
+
+        // Insert readings for this batch
+        const batchReadings = [];
+        for (const otId of batchIds) {
+          const g = otMap[otId];
+          const fechaStr = g.fecha && g.fecha.length >= 10 ? g.fecha.substring(0, 10) : "2025-01-01";
+          for (const [name, p] of Object.entries(g.params)) {
+            const paramId = paramIndex[otId + "|" + name];
+            if (paramId) batchReadings.push({ ot_id: otId, parameter_id: paramId, value: p.value, created_at: fechaStr + "T12:00:00" });
+          }
+        }
+        if (batchReadings.length > 0) {
+          await supabase.from("readings").insert(batchReadings);
+          totalReadings += batchReadings.length;
+        }
+
+        setProgress({ ok: i + PBATCH, skip: 0, total: otIds.length });
+        setStatus("Procesando lote " + Math.ceil((i+1)/PBATCH) + " de " + Math.ceil(otIds.length/PBATCH) + " — " + totalReadings + " lecturas insertadas");
       }
-      for (let i = 0; i < allReadings.length; i += 500) {
-        await supabase.from("readings").insert(allReadings.slice(i, i + 500));
-        setStatus("Lecturas: " + Math.min(i + 500, allReadings.length) + " de " + allReadings.length);
-        setProgress({ ok: i + 500, skip: 0, total: allReadings.length });
-      }
+      const allReadings = { length: totalReadings };
 
       setDone(true);
       setStatus("✅ Importación completa. " + otIds.length + " OTs y " + allReadings.length + " lecturas importadas.");
