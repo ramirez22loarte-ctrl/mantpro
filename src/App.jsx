@@ -100,9 +100,9 @@ const db = {
   async getEquipment() { const { data } = await supabase.from("equipment").select("*").order("name"); return data || []; },
   async getJIs() { const { data } = await supabase.from("job_instructions").select("*").order("code"); return data || []; },
   async getUsers() { const { data } = await supabase.from("users").select("*").order("name"); return data || []; },
-  async getOTs(userId, isAdmin) {
+  async getOTs(userId, isAdmin, discipline) {
     let q = supabase.from("work_orders").select("*").order("created_at", { ascending: false });
-    if (!isAdmin) q = q.eq("assigned_to", userId);
+    if (!isAdmin && discipline) q = q.eq("discipline", discipline);
     const { data } = await q;
     return data || [];
   },
@@ -396,9 +396,8 @@ function ExcelImport({ onClose, onImported }) {
 }
 
 // ── TECH OT SEARCH ────────────────────────────────────────────
-function TechOTSearch({ user, onFound }) {
+function TechOTSearch({ user, onFound, onClose }) {
   const [otNum, setOtNum] = useState("");
-  const [disc, setDisc] = useState(user.discipline || "Mecánico");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
@@ -412,24 +411,22 @@ function TechOTSearch({ user, onFound }) {
   };
 
   return (
-    <div className="ov" onClick={e => e.target === e.currentTarget && null}>
-      <div className="mod fd" style={{ width: 420 }}>
-        <div style={{ textAlign: "center", marginBottom: 22 }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>🔍</div>
-          <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 17, color: "#f1f5f9" }}>Buscar Orden de Trabajo</div>
-          <div style={{ fontSize: 12, color: "#475569", marginTop: 4 }}>Ingresa el número de tu OT para acceder a los parámetros</div>
+    <div className="ov" onClick={e => e.target === e.currentTarget && onClose && onClose()}>
+      <div className="mod fd" style={{ width: 400 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <div style={{ textAlign: "center", flex: 1 }}>
+            <div style={{ fontSize: 32, marginBottom: 6 }}>🔍</div>
+            <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 17, color: "#f1f5f9" }}>Buscar Orden de Trabajo</div>
+            <div style={{ fontSize: 12, color: "#475569", marginTop: 4 }}>Ingresa el número de tu OT</div>
+          </div>
+          <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "5px 11px", alignSelf: "flex-start" }}>✕</button>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
           <Lbl l="N° Orden de Trabajo">
             <input className="inp" placeholder="Ej: 2000194307" value={otNum}
               onChange={e => setOtNum(e.target.value)}
               onKeyDown={e => e.key === "Enter" && search()}
-              style={{ fontFamily: "Syne,sans-serif", fontSize: 16, letterSpacing: "0.05em" }} />
-          </Lbl>
-          <Lbl l="Tu Disciplina">
-            <select className="inp" value={disc} onChange={e => setDisc(e.target.value)}>
-              {["Mecánico","Eléctrico","Instrumentación"].map(d => <option key={d}>{d}</option>)}
-            </select>
+              style={{ fontFamily: "Syne,sans-serif", fontSize: 16, letterSpacing: "0.05em" }} autoFocus />
           </Lbl>
           {err && <div style={{ fontSize: 12, color: "#f87171", background: "#3b0f0f", padding: "8px 12px", borderRadius: 7 }}>{err}</div>}
           <button className="btn" onClick={search} disabled={loading || !otNum.trim()}
@@ -1448,7 +1445,7 @@ export default function App() {
   const [selectedOTs, setSelectedOTs] = useState(new Set());
 
   const isAdmin = user?.role === "admin";
-  const myOTsAll = isAdmin ? ots : ots.filter(o => o.assigned_to === user?.id);
+  const myOTsAll = isAdmin ? ots : ots; // techs see all OTs of their discipline (filtered at DB level)
   const myOTs = myOTsAll
     .filter(o => !filterOTDisc || o.discipline === filterOTDisc)
     .filter(o => !filterOTStatus || o.status === filterOTStatus);
@@ -1461,7 +1458,7 @@ export default function App() {
       db.getEquipment().then(setEquipment),
       db.getJIs().then(setJis),
       db.getUsers().then(setUsers),
-      db.getOTs(user.id, isAdmin).then(setOts),
+      db.getOTs(user.id, isAdmin, user.discipline).then(setOts),
       db.getAllReadings().then(setAllReadings),
     ]).finally(() => setLoading(false));
   }, [user]);
@@ -1979,10 +1976,10 @@ export default function App() {
       {modal === "newLoc" && <NewLoc onClose={closeModal} onSave={loc => { setLocations(p => [...p, loc]); closeModal(); }} />}
       {modal === "newJI" && <NewJI onClose={closeModal} onSave={ji => { setJis(p => [...p, ji]); closeModal(); }} />}
       {modal === "newUser" && <NewUser onClose={closeModal} onSave={u => { setUsers(p => [...p, u]); closeModal(); }} />}
-      {modal === "importExcel" && <ExcelImport onClose={closeModal} onImported={async () => { const data = await db.getOTs(user.id, isAdmin); setOts(data); }} />}
+      {modal === "importExcel" && <ExcelImport onClose={closeModal} onImported={async () => { const data = await db.getOTs(user.id, isAdmin, user.discipline); setOts(data); }} />}
       {modal === "importEquip" && <ImportEquip onClose={closeModal} onSave={eq => setEquipment(p => [...p, eq])} />}
       {modal === "editEquip" && selOT && <EditEquip eq={selOT} onClose={closeModal} onSave={updated => setEquipment(p => p.map(e => e.id === updated.id ? updated : e))} />}
-      {modal === "searchOT" && <TechOTSearch user={user} onFound={ot => { setSelOT(ot); setModal("otDetail"); }} />}
+      {modal === "searchOT" && <TechOTSearch user={user} onFound={ot => { setSelOT(ot); setModal("otDetail"); }} onClose={closeModal} />}
     </div>
   );
 }
