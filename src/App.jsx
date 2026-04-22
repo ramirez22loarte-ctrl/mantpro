@@ -1491,32 +1491,22 @@ function ImportHistorico({ equipment }) {
       const XLSX = window.XLSX;
       if (!XLSX) { setStatus("⚠️ Recarga la página."); setLoading(false); return; }
       const wb = XLSX.read(new Uint8Array(buf), { type: "array" });
-
-      // Find "PARAMETROS GENERALES" sheet
       const sheetName = wb.SheetNames.find(s => s.toUpperCase().includes("PARAMETROS GENERALES")) || wb.SheetNames[0];
       const ws = wb.Sheets[sheetName];
       const rows = XLSX.utils.sheet_to_json(ws, { defval: null, header: 1 });
 
-      // Row 0 = headers, Row 1+ = data
-      // Cols: 0=AREA, 1=SUBAREA, 2=TAG, 3=AÑO, 4=MES, 5=FECHA, 6=N°OT, 7+=params
-      setStatus("Procesando " + (rows.length - 1) + " registros...");
+      setStatus("Procesando " + (rows.length - 1) + " registros en memoria...");
 
-      let ok = 0, skip = 0;
-      const total = rows.length - 1;
-      setProgress({ ok: 0, skip: 0, total });
-
+      // STEP 1: Build all data in memory (no DB calls yet)
+      const otMap = {}; // otId -> {disc, tag, fecha, eq_id, params: {name->value}}
       for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
-        if (!row || !row[6]) { skip++; continue; }
-
+        if (!row || !row[6]) continue;
         const tag = String(row[2] || "").trim().toUpperCase();
-        const otNum = String(row[6]).trim().replace(".0", "");
-        const fecha = row[5] ? String(row[5]).substring(0, 10) : new Date().toISOString().split("T")[0];
-
-        // Find equipment by TAG
+        const otNum = String(Math.round(row[6]));
+        const fecha = row[5] ? String(row[5]).substring(0, 10) : "2025-01-01";
         const eq = equipment.find(e => e.code && e.code.toUpperCase() === tag);
 
-        // Process each discipline's params for this row
         const discGroups = {};
         for (const pm of PARAM_COL_MAP) {
           const val = row[pm.col];
@@ -1530,48 +1520,67 @@ function ImportHistorico({ equipment }) {
         for (const [disc, params] of Object.entries(discGroups)) {
           const suffix = disc === "Mecánico" ? "" : disc === "Eléctrico" ? "-E" : "-I";
           const otId = otNum + suffix;
-
-          // Create OT if not exists
-          const { data: existing } = await supabase.from("work_orders").select("id").eq("id", otId).single();
-          if (!existing) {
-            await supabase.from("work_orders").insert({
-              id: otId,
-              title: "HIST " + disc.substring(0,3).toUpperCase() + " " + tag,
-              discipline: disc,
-              priority: "Media",
-              status: "Cerrada",
-              description: tag + "|||Histórico",
-              created_at: fecha,
-              equipment_id: eq?.id || null,
-              location_id: null, assigned_to: null, job_instruction_id: null, due_date: null
-            });
-          }
-
-          // For each param, ensure parameter exists then insert reading
-          for (const p of params) {
-            let { data: param } = await supabase.from("parameters").select("id").eq("ot_id", otId).eq("name", p.name).single();
-            if (!param) {
-              const { data: newP } = await supabase.from("parameters").insert({ ot_id: otId, name: p.name, unit: p.unit, expected: "", sort_order: 0 }).select().single();
-              param = newP;
-            }
-            if (param) {
-              await supabase.from("readings").insert({ ot_id: otId, parameter_id: param.id, value: p.value, created_at: fecha + " 12:00:00" });
-            }
-          }
-          ok++;
-        }
-
-        if (i % 20 === 0) {
-          setProgress({ ok, skip, total });
-          setStatus("Importando... " + i + " de " + total + " filas");
+          if (!otMap[otId]) otMap[otId] = { disc, tag, fecha, eq_id: eq?.id || null, params: {} };
+          for (const p of params) otMap[otId].params[p.name] = { unit: p.unit, value: p.value };
         }
       }
 
-      setProgress({ ok, skip, total });
+      const otIds = Object.keys(otMap);
+      setStatus("Insertando " + otIds.length + " OTs en lote...");
+      setProgress({ ok: 0, skip: 0, total: otIds.length });
+
+      // STEP 2: Bulk insert work_orders (batch of 200)
+      const BATCH = 200;
+      for (let i = 0; i < otIds.length; i += BATCH) {
+        const batch = otIds.slice(i, i + BATCH).map(otId => {
+          const g = otMap[otId];
+          return { id: otId, title: "HIST " + g.disc.substring(0,3).toUpperCase() + " " + g.tag, discipline: g.disc, priority: "Media", status: "Cerrada", description: g.tag + "|||Histórico", created_at: g.fecha, equipment_id: g.eq_id, location_id: null, assigned_to: null, job_instruction_id: null, due_date: null };
+        });
+        await supabase.from("work_orders").upsert(batch, { onConflict: "id", ignoreDuplicates: true });
+        setProgress({ ok: i + BATCH, skip: 0, total: otIds.length });
+        setStatus("OTs: " + Math.min(i + BATCH, otIds.length) + " de " + otIds.length);
+      }
+
+      // STEP 3: Bulk insert parameters (batch of 500)
+      setStatus("Insertando parámetros en lote...");
+      const allParams = [];
+      for (const otId of otIds) {
+        for (const [name, p] of Object.entries(otMap[otId].params)) {
+          allParams.push({ ot_id: otId, name, unit: p.unit, expected: "", sort_order: 0 });
+        }
+      }
+      for (let i = 0; i < allParams.length; i += 500) {
+        await supabase.from("parameters").upsert(allParams.slice(i, i + 500), { onConflict: "ot_id,name", ignoreDuplicates: true });
+        setStatus("Parámetros: " + Math.min(i + 500, allParams.length) + " de " + allParams.length);
+      }
+
+      // STEP 4: Fetch all created parameter IDs in bulk
+      setStatus("Obteniendo IDs de parámetros...");
+      const { data: paramRows } = await supabase.from("parameters").select("id, ot_id, name").in("ot_id", otIds);
+      const paramIndex = {};
+      (paramRows || []).forEach(p => { paramIndex[p.ot_id + "|" + p.name] = p.id; });
+
+      // STEP 5: Bulk insert readings (batch of 500)
+      setStatus("Insertando lecturas en lote...");
+      const allReadings = [];
+      for (const otId of otIds) {
+        const g = otMap[otId];
+        for (const [name, p] of Object.entries(g.params)) {
+          const paramId = paramIndex[otId + "|" + name];
+          if (paramId) allReadings.push({ ot_id: otId, parameter_id: paramId, value: p.value, created_at: g.fecha + " 12:00:00" });
+        }
+      }
+      for (let i = 0; i < allReadings.length; i += 500) {
+        await supabase.from("readings").insert(allReadings.slice(i, i + 500));
+        setStatus("Lecturas: " + Math.min(i + 500, allReadings.length) + " de " + allReadings.length);
+        setProgress({ ok: i + 500, skip: 0, total: allReadings.length });
+      }
+
       setDone(true);
-      setStatus("✅ Importación completa. " + ok + " grupos importados.");
+      setStatus("✅ Importación completa. " + otIds.length + " OTs y " + allReadings.length + " lecturas importadas.");
     } catch(e) {
       setStatus("⚠️ Error: " + e.message);
+      console.error(e);
     }
     setLoading(false);
   };
