@@ -747,8 +747,19 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
               <div style={{ fontSize: 12, color: D_COLOR[ot.discipline], fontWeight: 600 }}>
                 {D_ICON[ot.discipline]} Parámetros {ot.discipline} — {params.length} campos
               </div>
-              <div style={{ fontSize: 11, color: "#334155", fontStyle: "italic" }}>
-                💡 Se guarda automáticamente al cambiar de pestaña
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                {isAdmin && readings.length > 0 && (
+                  <button className="btn" onClick={async () => {
+                    if (!window.confirm("¿Eliminar todas las lecturas de esta OT?")) return;
+                    await supabase.from("readings").delete().eq("ot_id", ot.id);
+                    setReadings([]);
+                  }} style={{ background: "#3b0f0f", color: "#f87171", padding: "5px 10px", fontSize: 11 }}>
+                    🗑️ Limpiar lecturas
+                  </button>
+                )}
+                <div style={{ fontSize: 11, color: "#334155", fontStyle: "italic" }}>
+                  💡 Se guarda automáticamente al cambiar de pestaña
+                </div>
               </div>
             </div>
             <div style={{ overflowX: "auto" }}>
@@ -813,11 +824,18 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
               ? <div style={{ color: "#334155", textAlign: "center", padding: 20, fontSize: 13 }}>Sin comentarios aún.</div>
               : <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
                 {comments.map(c => (
-                  <div key={c.id} style={{ background: "#060b14", borderRadius: 8, padding: "10px 13px", borderLeft: `3px solid ${D_COLOR[c.discipline] || "#3b82f6"}` }}>
+                  <div key={c.id} style={{ background: "#060b14", borderRadius: 8, padding: "10px 13px", borderLeft: `3px solid ${D_COLOR[c.discipline] || "#3b82f6"}`, position: "relative" }}>
                     <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 5, flexWrap: "wrap" }}>
                       <span style={{ fontSize: 13, fontWeight: 600, color: "#f1f5f9" }}>{c.author || "Técnico"}</span>
                       <span style={{ fontSize: 10, color: "#475569" }}>{c.role || ""}{c.discipline ? " · " + c.discipline : ""}</span>
                       <span style={{ fontSize: 10, color: "#334155", marginLeft: "auto" }}>{c.created_at ? new Date(c.created_at).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" }) : "—"}</span>
+                      {isAdmin && (
+                        <button className="btn" onClick={async () => {
+                          if (!window.confirm("¿Eliminar este comentario?")) return;
+                          await supabase.from("comments").delete().eq("id", c.id);
+                          setComments(prev => prev.filter(x => x.id !== c.id));
+                        }} style={{ background: "#3b0f0f", color: "#f87171", padding: "2px 8px", fontSize: 10 }}>✕</button>
+                      )}
                     </div>
                     <p style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.5 }}>{c.text}</p>
                   </div>
@@ -1668,6 +1686,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [filterOTDisc, setFilterOTDisc] = useState("");
   const [filterOTStatus, setFilterOTStatus] = useState("");
+  const [selectedVerif, setSelectedVerif] = useState(new Set());
   const [selectedOTs, setSelectedOTs] = useState(new Set());
 
   const isAdmin = user?.role === "admin";
@@ -2116,6 +2135,15 @@ export default function App() {
                 ) : otList.map(([otId, g]) => (
                   <div key={otId} className="card" style={{ marginBottom: 14 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                      <input type="checkbox" checked={selectedVerif.has(otId)}
+                        onChange={e => {
+                          const next = new Set(selectedVerif);
+                          e.target.checked ? next.add(otId) : next.delete(otId);
+                          setSelectedVerif(next);
+                        }}
+                        style={{ width: 16, height: 16, cursor: "pointer", marginTop: 4, accentColor: "#3b82f6" }}
+                      />
                       <div>
                         <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4 }}>
                           <span style={{ fontFamily: "Syne,sans-serif", fontSize: 12, color: "#3b82f6", fontWeight: 700 }}>{otId}</span>
@@ -2124,6 +2152,7 @@ export default function App() {
                         </div>
                         <div style={{ fontSize: 13, fontWeight: 600, color: "#f1f5f9" }}>{g.title}</div>
                         <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>{g.readings.length} lecturas registradas</div>
+                      </div>
                       </div>
                       <div style={{ display: "flex", gap: 8 }}>
                         <button className="btn" onClick={() => downloadOTPDF(otId, g)}
