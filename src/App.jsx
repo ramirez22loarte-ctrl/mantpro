@@ -1460,27 +1460,30 @@ function ImportHistorico({ equipment }) {
   const [progress, setProgress] = useState({ ok: 0, skip: 0, total: 0 });
   const fileRef = useRef();
 
+  // Índices 0-based (sheet_to_json con header:1 usa índices de array)
   const PARAM_COL_MAP = [
-    { col: 7,  name: "Caudal",                    unit: "L/S",   disc: "Mecánico"  },
-    { col: 8,  name: "Presión",                   unit: "PSI",   disc: "Mecánico"  },
-    { col: 11, name: "T° Lado Libre Motor",        unit: "°C",    disc: "Mecánico"  },
-    { col: 12, name: "T° Lado Acople Motor",       unit: "°C",    disc: "Mecánico"  },
-    { col: 13, name: "T° Lado Libre Bomba",        unit: "°C",    disc: "Mecánico"  },
-    { col: 14, name: "T° Lado Acople Bomba",       unit: "°C",    disc: "Mecánico"  },
-    { col: 15, name: "Vibración Axial Bomba",      unit: "mm/s",  disc: "Mecánico"  },
-    { col: 16, name: "Vibración Axial Motor",      unit: "mm/s",  disc: "Mecánico"  },
-    { col: 17, name: "Vibración Lado Libre Motor", unit: "mm/s",  disc: "Mecánico"  },
-    { col: 18, name: "Vibración Lado Acople Motor",unit: "mm/s",  disc: "Mecánico"  },
-    { col: 19, name: "Vibración Lado Libre Bomba", unit: "mm/s",  disc: "Mecánico"  },
-    { col: 20, name: "Vibración Lado Acople Bomba",unit: "mm/s",  disc: "Mecánico"  },
-    { col: 21, name: "Corriente Fase I",           unit: "A",     disc: "Eléctrico" },
-    { col: 22, name: "Corriente Fase II",          unit: "A",     disc: "Eléctrico" },
-    { col: 23, name: "Corriente Fase III",         unit: "A",     disc: "Eléctrico" },
-    { col: 24, name: "Voltaje 1-2",                unit: "V",     disc: "Eléctrico" },
-    { col: 25, name: "Voltaje 2-3",                unit: "V",     disc: "Eléctrico" },
-    { col: 26, name: "Voltaje 1-3",                unit: "V",     disc: "Eléctrico" },
-    { col: 27, name: "Frecuencia",                 unit: "Hz",    disc: "Eléctrico" },
-    { col: 28, name: "Potencia",                   unit: "W",     disc: "Eléctrico" },
+    { col: 7,  name: "Caudal",                     unit: "L/S",   disc: "Mecánico"  },
+    { col: 8,  name: "Presión",                    unit: "PSI",   disc: "Mecánico"  },
+    { col: 11, name: "T° Lado Libre Motor",         unit: "°C",    disc: "Mecánico"  },
+    { col: 12, name: "T° Lado Acople Motor",        unit: "°C",    disc: "Mecánico"  },
+    { col: 13, name: "T° Lado Libre Bomba",         unit: "°C",    disc: "Mecánico"  },
+    { col: 14, name: "T° Lado Acople Bomba",        unit: "°C",    disc: "Mecánico"  },
+    { col: 15, name: "Vibración Axial Bomba",       unit: "mm/s",  disc: "Mecánico"  },
+    { col: 16, name: "Vibración Axial Motor",       unit: "mm/s",  disc: "Mecánico"  },
+    { col: 17, name: "Vibración Lado Libre Motor",  unit: "mm/s",  disc: "Mecánico"  },
+    { col: 18, name: "Vibración Lado Acople Motor", unit: "mm/s",  disc: "Mecánico"  },
+    { col: 19, name: "Vibración Lado Libre Bomba",  unit: "mm/s",  disc: "Mecánico"  },
+    { col: 20, name: "Vibración Lado Acople Bomba", unit: "mm/s",  disc: "Mecánico"  },
+    { col: 21, name: "Corriente Fase I",            unit: "A",     disc: "Eléctrico" },
+    { col: 22, name: "Corriente Fase II",           unit: "A",     disc: "Eléctrico" },
+    { col: 23, name: "Corriente Fase III",          unit: "A",     disc: "Eléctrico" },
+    { col: 24, name: "Voltaje 1-2",                 unit: "V",     disc: "Eléctrico" },
+    { col: 25, name: "Voltaje 2-3",                 unit: "V",     disc: "Eléctrico" },
+    { col: 26, name: "Voltaje 1-3",                 unit: "V",     disc: "Eléctrico" },
+    { col: 27, name: "Frecuencia",                  unit: "Hz",    disc: "Eléctrico" },
+    { col: 28, name: "Potencia",                    unit: "W",     disc: "Eléctrico" },
+    { col: 29, name: "Horómetro",                   unit: "hrs",   disc: "Eléctrico" },
+    { col: 30, name: "Corriente Nominal Motor",     unit: "A",     disc: "Eléctrico" },
   ];
 
   const processFile = async (f) => {
@@ -1501,9 +1504,9 @@ function ImportHistorico({ equipment }) {
       const otMap = {}; // otId -> {disc, tag, fecha, eq_id, params: {name->value}}
       for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
-        if (!row || !row[6]) continue;
+        if (!row || !row[6] || row[6] === null) continue;
         const tag = String(row[2] || "").trim().toUpperCase();
-        const otNum = String(Math.round(row[6]));
+        const otNum = row[6] ? String(Math.round(Number(row[6]))) : null;
         const fecha = row[5] ? String(row[5]).substring(0, 10) : "2025-01-01";
         const eq = equipment.find(e => e.code && e.code.toUpperCase() === tag);
 
