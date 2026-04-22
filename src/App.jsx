@@ -1331,11 +1331,14 @@ export default function App() {
   const [sideOpen, setSideOpen] = useState(true);
   const [loading, setLoading] = useState(false);
   const [filterOTDisc, setFilterOTDisc] = useState("");
+  const [filterOTStatus, setFilterOTStatus] = useState("");
   const [selectedOTs, setSelectedOTs] = useState(new Set());
 
   const isAdmin = user?.role === "admin";
   const myOTsAll = isAdmin ? ots : ots.filter(o => o.assigned_to === user?.id);
-  const myOTs = filterOTDisc ? myOTsAll.filter(o => o.discipline === filterOTDisc) : myOTsAll;
+  const myOTs = myOTsAll
+    .filter(o => !filterOTDisc || o.discipline === filterOTDisc)
+    .filter(o => !filterOTStatus || o.status === filterOTStatus);
 
   useEffect(() => {
     if (!user) return;
@@ -1445,8 +1448,11 @@ export default function App() {
           {page === "dashboard" && (
             <div className="fd">
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 10, marginBottom: 18 }}>
-                {[{ l: "Total OTs", v: stats.total, c: "#3b82f6", i: "📋" }, { l: "Abiertas", v: stats.open, c: "#60a5fa", i: "🔵" }, { l: "En Progreso", v: stats.prog, c: "#10b981", i: "🟢" }, { l: "Cerradas", v: stats.closed, c: "#8b5cf6", i: "✅" }, { l: "Críticas", v: stats.crit, c: "#ef4444", i: "🔴" }].map(s => (
-                  <div key={s.l} className="card" style={{ borderLeft: `3px solid ${s.c}` }}>
+                {[{ l: "Total OTs", v: stats.total, c: "#3b82f6", i: "📋", s: "" }, { l: "Abiertas", v: stats.open, c: "#60a5fa", i: "🔵", s: "Abierta" }, { l: "En Progreso", v: stats.prog, c: "#10b981", i: "🟢", s: "En Progreso" }, { l: "Cerradas", v: stats.closed, c: "#8b5cf6", i: "✅", s: "Cerrada" }, { l: "Críticas", v: stats.crit, c: "#ef4444", i: "🔴", s: "Crítica" }].map(s => (
+                  <div key={s.l} className="card" onClick={() => { setFilterOTStatus(s.s); setFilterOTDisc(""); handlePageChange("ots"); }}
+                    style={{ borderLeft: `3px solid ${s.c}`, cursor: "pointer", transition: "transform .15s" }}
+                    onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
+                    onMouseLeave={e => e.currentTarget.style.transform = "none"}>
                     <div style={{ fontSize: 18, marginBottom: 5 }}>{s.i}</div>
                     <div style={{ fontFamily: "Syne,sans-serif", fontSize: 24, fontWeight: 800, color: s.c }}>{s.v}</div>
                     <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>{s.l}</div>
