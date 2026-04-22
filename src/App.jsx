@@ -1608,7 +1608,6 @@ export default function App() {
                         <td style={{ color: "#cbd5e1" }}>{eq.type || "—"}</td>
                         <td style={{ color: "#94a3b8" }}>{eq.area || "—"}</td>
                         <td style={{ color: "#94a3b8" }}>{eq.subarea || "—"}</td>
-                        <td><span style={{ color: D_COLOR[eq.discipline], fontSize: 12 }}>{D_ICON[eq.discipline]} {eq.discipline}</span></td>
                         <td style={{ display: "flex", gap: 6 }}>
                           <button className="btn" onClick={() => { setSelOT({ ...eq, _editEquip: true }); setModal("editEquip"); }}
                             style={{ background: "#0f2040", color: "#60a5fa", padding: "3px 10px", fontSize: 11 }}>✏️ Editar</button>
