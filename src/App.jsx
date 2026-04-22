@@ -802,27 +802,50 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
         )}
 
         {tab === "info" && (() => {
-          const parts = (ot.description || "").split("|");
-          const infoTag = parts[0]?.trim() || eq?.code || "—";
-          const infoArea = parts[1]?.trim() || eq?.area || "—";
-          const infoSubarea = parts[2]?.trim() || eq?.subarea || "—";
-          const infoDesc = parts.slice(3).join("|").trim() || ot.title || "—";
+          // Extract TAG from description - supports both formats:
+          // New: "PPZ402|AREA|SUBAREA|DESC"
+          // Old: "Tag: PPZ402 | DESC"
+          const desc = ot.description || "";
+          let infoTag = "";
+          let infoDesc = ot.title || "—";
+
+          const oldMatch = desc.match(/^Tag:\s*([^|\s]+)/i);
+          if (oldMatch) {
+            infoTag = oldMatch[1].trim();
+            infoDesc = desc.replace(/^Tag:\s*[^|]+\|?\s*/, "").trim() || ot.title;
+          } else if (desc.includes("|")) {
+            const parts = desc.split("|");
+            infoTag = parts[0]?.trim() || "";
+            infoDesc = parts.slice(3).join("|").trim() || parts.slice(1).join(" ").trim() || ot.title;
+          } else {
+            infoTag = desc.trim() || "";
+            infoDesc = ot.title || "—";
+          }
+
+          // Look up equipment by TAG to get area/subarea (like BUSCARV)
+          const eqByTag = equipment.find(e => e.code && e.code.toUpperCase() === infoTag.toUpperCase());
+          const infoArea = eqByTag?.area || "—";
+          const infoSubarea = eqByTag?.subarea || "—";
+
           return (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                {[
-                  { l: "TAG / Equipo", v: infoTag, c: "#3b82f6", bold: true },
-                  { l: "Disciplina", v: D_ICON[ot.discipline] + " " + ot.discipline, c: D_COLOR[ot.discipline] },
-                  { l: "Área", v: infoArea, c: "#f1f5f9" },
-                  { l: "Sub-Área", v: infoSubarea, c: "#f1f5f9" },
-                  { l: "Fecha Creación", v: ot.created_at, c: "#f1f5f9" },
-                  { l: "Prioridad", v: ot.priority, c: P_COLOR[ot.priority] },
-                ].map(item => (
-                  <div key={item.l} style={{ background: "#060b14", borderRadius: 8, padding: "10px 14px" }}>
-                    <div style={{ fontSize: 10, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>{item.l}</div>
-                    <div style={{ fontSize: 13, fontWeight: item.bold ? 700 : 500, color: item.c, fontFamily: item.bold ? "Syne,sans-serif" : "inherit" }}>{item.v || "—"}</div>
-                  </div>
-                ))}
+                <div style={{ background: "#060b14", borderRadius: 8, padding: "10px 14px" }}>
+                  <div style={{ fontSize: 10, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>TAG / Equipo</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: "#3b82f6", fontFamily: "Syne,sans-serif" }}>{infoTag || "—"}</div>
+                </div>
+                <div style={{ background: "#060b14", borderRadius: 8, padding: "10px 14px" }}>
+                  <div style={{ fontSize: 10, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Fecha Creación</div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: "#f1f5f9" }}>{ot.created_at || "—"}</div>
+                </div>
+                <div style={{ background: "#060b14", borderRadius: 8, padding: "10px 14px" }}>
+                  <div style={{ fontSize: 10, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Área</div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: "#f1f5f9" }}>{infoArea}</div>
+                </div>
+                <div style={{ background: "#060b14", borderRadius: 8, padding: "10px 14px" }}>
+                  <div style={{ fontSize: 10, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Sub-Área</div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: "#f1f5f9" }}>{infoSubarea}</div>
+                </div>
               </div>
               <div style={{ background: "#060b14", borderRadius: 8, padding: "12px 14px" }}>
                 <div style={{ fontSize: 10, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Descripción de Actividad</div>
@@ -1131,32 +1154,38 @@ function DashboardOperativo({ allReadings, equipment }) {
       .filter(Boolean)
   )].sort();
 
-  // Helper: extract TAG from OT description field "TAG|AREA|SUBAREA|DESC"
+  // Helper: extract TAG from OT description - supports both formats:
+  // New: "PPZ402|AREA|SUBAREA|DESC"
+  // Old: "Tag: PPZ402 | DESC"
   const getOTTag = (r) => {
     const desc = r.work_orders?.description || "";
+    // Old format: "Tag: PPZ402 | ..."
+    const oldMatch = desc.match(/^Tag:\s*([^|\s]+)/i);
+    if (oldMatch) return oldMatch[1].trim().toUpperCase();
+    // New format: "PPZ402|AREA|SUBAREA|DESC"
     const parts = desc.split("|");
-    if (parts[0] && parts[0].trim()) return parts[0].trim();
-    // Fallback: find equipment code in title
+    const first = parts[0]?.trim();
+    // Validate it looks like a TAG (not a long description)
+    if (first && first.length < 20 && !first.includes(" ")) return first.toUpperCase();
+    // Fallback: match against known equipment codes
     const title = r.work_orders?.title || "";
-    const found = equipment.find(e => e.code && title.toUpperCase().includes(e.code.toUpperCase()));
+    const found = equipment.find(e => e.code && (
+      title.toUpperCase().includes(e.code.toUpperCase()) ||
+      desc.toUpperCase().includes(e.code.toUpperCase())
+    ));
     return found?.code || "";
   };
 
+  // Area and Subarea: look up from equipment table using TAG (like BUSCARV)
   const getOTArea = (r) => {
-    const desc = r.work_orders?.description || "";
-    const parts = desc.split("|");
-    if (parts[1] && parts[1].trim()) return parts[1].trim();
     const tag = getOTTag(r);
-    const eq = equipment.find(e => e.code === tag);
+    const eq = equipment.find(e => e.code && e.code.toUpperCase() === tag);
     return eq?.area || "";
   };
 
   const getOTSubarea = (r) => {
-    const desc = r.work_orders?.description || "";
-    const parts = desc.split("|");
-    if (parts[2] && parts[2].trim()) return parts[2].trim();
     const tag = getOTTag(r);
-    const eq = equipment.find(e => e.code === tag);
+    const eq = equipment.find(e => e.code && e.code.toUpperCase() === tag);
     return eq?.subarea || "";
   };
 
