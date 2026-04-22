@@ -2128,6 +2128,25 @@ export default function App() {
                   }} style={{ background: "#0f2040", color: "#60a5fa", padding: "8px 14px", fontSize: 13 }}>
                     📊 Exportar Todo a Excel
                   </button>
+                  <button className="btn" onClick={() => {
+                    if (selectedVerif.size === otList.length) setSelectedVerif(new Set());
+                    else setSelectedVerif(new Set(otList.map(([id]) => id)));
+                  }} style={{ background: "#111c30", color: "#60a5fa", padding: "8px 14px", fontSize: 13 }}>
+                    {selectedVerif.size === otList.length ? "☐ Deseleccionar todo" : "☑ Seleccionar todo"}
+                  </button>
+                  {selectedVerif.size > 0 && (
+                    <button className="btn" onClick={async () => {
+                      if (!window.confirm("¿Eliminar lecturas de " + selectedVerif.size + " OTs seleccionadas?")) return;
+                      for (const otId of selectedVerif) {
+                        await supabase.from("readings").delete().eq("ot_id", otId);
+                      }
+                      const fresh = await db.getAllReadings();
+                      setAllReadings(fresh);
+                      setSelectedVerif(new Set());
+                    }} style={{ background: "#3b0f0f", color: "#f87171", padding: "8px 14px", fontSize: 13 }}>
+                      🗑️ Eliminar {selectedVerif.size} seleccionadas
+                    </button>
+                  )}
                 </div>
 
                 {otList.length === 0 ? (
