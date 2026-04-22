@@ -1190,60 +1190,62 @@ function DashboardOperativo({ allReadings, equipment }) {
   // Build filter options from data
   const fechas = [...new Set(allReadings.map(r => r.created_at ? new Date(r.created_at).toLocaleDateString("es-CO") : "").filter(Boolean))].sort().reverse();
 
-  // Cascading filters
-  const areas = [...new Set(equipment.map(e => e.area).filter(Boolean))].sort();
+  // Build area/tag/subarea from READINGS (includes historical data)
+  const allAreas = [...new Set(allReadings.map(r => getOTArea(r)).filter(Boolean))].sort();
+  const areas = allAreas;
 
   // TAGs filtered by selected area
   const tags = [...new Set(
-    equipment
-      .filter(e => !filterArea || e.area === filterArea)
-      .map(e => e.code)
+    allReadings
+      .filter(r => !filterArea || getOTArea(r) === filterArea)
+      .map(r => getOTTag(r))
       .filter(Boolean)
   )].sort();
 
   // Sub-areas filtered by selected area AND tag
   const subareas = [...new Set(
-    equipment
-      .filter(e => !filterArea || e.area === filterArea)
-      .filter(e => !filterTag || e.code === filterTag)
-      .map(e => e.subarea)
+    allReadings
+      .filter(r => !filterArea || getOTArea(r) === filterArea)
+      .filter(r => !filterTag || getOTTag(r) === filterTag)
+      .map(r => getOTSubarea(r))
       .filter(Boolean)
   )].sort();
 
-  // Helper: extract TAG from OT description - supports both formats:
-  // New: "PPZ402|AREA|SUBAREA|DESC"
-  // Old: "Tag: PPZ402 | DESC"
+  // Helper: extract TAG from OT description
+  // Formats: "PPZ402|AREA|SUBAREA|DESC" or "Tag: PPZ402 | DESC"
   const getOTTag = (r) => {
     const desc = r.work_orders?.description || "";
-    // Old format: "Tag: PPZ402 | ..."
     const oldMatch = desc.match(/^Tag:\s*([^|\s]+)/i);
     if (oldMatch) return oldMatch[1].trim().toUpperCase();
-    // New format: "PPZ402|AREA|SUBAREA|DESC"
     const parts = desc.split("|");
     const first = parts[0]?.trim();
-    // Validate it looks like a TAG (not a long description)
-    if (first && first.length < 20 && !first.includes(" ")) return first.toUpperCase();
-    // Fallback: match against known equipment codes
+    if (first && first.length < 20 && !first.includes(" ") && first !== "") return first.toUpperCase();
     const title = r.work_orders?.title || "";
-    const found = equipment.find(e => e.code && (
-      title.toUpperCase().includes(e.code.toUpperCase()) ||
-      desc.toUpperCase().includes(e.code.toUpperCase())
-    ));
+    const found = equipment.find(e => e.code && title.toUpperCase().includes(e.code.toUpperCase()));
     return found?.code || "";
   };
 
-  // Area and Subarea: look up from equipment table using TAG (like BUSCARV)
+  // Area: from description field first (historical data has it), then from equipment table
   const getOTArea = (r) => {
+    const desc = r.work_orders?.description || "";
+    const parts = desc.split("|");
+    if (parts[1]?.trim()) return parts[1].trim();
     const tag = getOTTag(r);
     const eq = equipment.find(e => e.code && e.code.toUpperCase() === tag);
     return eq?.area || "";
   };
 
   const getOTSubarea = (r) => {
+    const desc = r.work_orders?.description || "";
+    const parts = desc.split("|");
+    if (parts[2]?.trim()) return parts[2].trim();
     const tag = getOTTag(r);
     const eq = equipment.find(e => e.code && e.code.toUpperCase() === tag);
     return eq?.subarea || "";
   };
+
+  // Build tag/area/subarea lists from ALL readings (not just equipment table)
+  // This ensures historical data appears in filters even without equipment record
 
   // Filter readings
   const filtered = allReadings.filter(r => {
@@ -1565,7 +1567,7 @@ function ImportHistorico({ equipment }) {
       for (let i = 0; i < otIds.length; i += BATCH) {
         const batch = otIds.slice(i, i + BATCH).map(otId => {
           const g = otMap[otId];
-          return { id: otId, title: "HIST " + g.disc.substring(0,3).toUpperCase() + " " + g.tag, discipline: g.disc, priority: "Media", status: "Cerrada", description: g.tag + "|||Histórico", created_at: g.fecha, equipment_id: g.eq_id, location_id: null, assigned_to: null, job_instruction_id: null, due_date: null };
+          return { id: otId, title: "HIST " + g.disc.substring(0,3).toUpperCase() + " " + g.tag, discipline: g.disc, priority: "Media", status: "Cerrada", description: g.tag + "|" + (g.area||"") + "|" + (g.subarea||"") + "|Histórico", created_at: g.fecha, equipment_id: g.eq_id, location_id: null, assigned_to: null, job_instruction_id: null, due_date: null };
         });
         await supabase.from("work_orders").upsert(batch, { onConflict: "id", ignoreDuplicates: true });
         setProgress({ ok: i + BATCH, skip: 0, total: otIds.length });
