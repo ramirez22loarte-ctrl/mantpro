@@ -801,30 +801,47 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
           </div>
         )}
 
-        {tab === "info" && (
-          <div>
-            <p style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.6, marginBottom: 14 }}>{ot.description || "Sin descripción."}</p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
-              {[{ l: "Equipo", v: eq?.name }, { l: "Ubicación", v: loc?.name }, { l: "Vence", v: ot.due_date }, { l: "Creada", v: ot.created_at }].map(i => (
-                <div key={i.l} style={{ background: "#060b14", borderRadius: 7, padding: "9px 11px" }}>
-                  <div style={{ fontSize: 10, color: "#334155", textTransform: "uppercase", marginBottom: 3 }}>{i.l}</div>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: "#cbd5e1" }}>{i.v || "—"}</div>
-                </div>
-              ))}
-            </div>
-            {isAdmin && (
-              <div>
-                <div style={{ fontSize: 11, color: "#475569", marginBottom: 7 }}>Cambiar estado:</div>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  {STATUSES.map(s => { const c = S_COLOR[s]; return (
-                    <button key={s} className="btn" onClick={() => changeStatus(s)}
-                      style={{ fontSize: 11, padding: "5px 11px", background: status === s ? c.bg : "#111c30", color: status === s ? c.text : "#475569", border: `1px solid ${status === s ? c.dot : "transparent"}` }}>{s}</button>
-                  ); })}
-                </div>
+        {tab === "info" && (() => {
+          const parts = (ot.description || "").split("|");
+          const infoTag = parts[0]?.trim() || eq?.code || "—";
+          const infoArea = parts[1]?.trim() || eq?.area || "—";
+          const infoSubarea = parts[2]?.trim() || eq?.subarea || "—";
+          const infoDesc = parts.slice(3).join("|").trim() || ot.title || "—";
+          return (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                {[
+                  { l: "TAG / Equipo", v: infoTag, c: "#3b82f6", bold: true },
+                  { l: "Disciplina", v: D_ICON[ot.discipline] + " " + ot.discipline, c: D_COLOR[ot.discipline] },
+                  { l: "Área", v: infoArea, c: "#f1f5f9" },
+                  { l: "Sub-Área", v: infoSubarea, c: "#f1f5f9" },
+                  { l: "Fecha Creación", v: ot.created_at, c: "#f1f5f9" },
+                  { l: "Prioridad", v: ot.priority, c: P_COLOR[ot.priority] },
+                ].map(item => (
+                  <div key={item.l} style={{ background: "#060b14", borderRadius: 8, padding: "10px 14px" }}>
+                    <div style={{ fontSize: 10, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>{item.l}</div>
+                    <div style={{ fontSize: 13, fontWeight: item.bold ? 700 : 500, color: item.c, fontFamily: item.bold ? "Syne,sans-serif" : "inherit" }}>{item.v || "—"}</div>
+                  </div>
+                ))}
               </div>
-            )}
-          </div>
-        )}
+              <div style={{ background: "#060b14", borderRadius: 8, padding: "12px 14px" }}>
+                <div style={{ fontSize: 10, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Descripción de Actividad</div>
+                <div style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.6 }}>{infoDesc}</div>
+              </div>
+              {isAdmin && (
+                <div style={{ background: "#060b14", borderRadius: 8, padding: "12px 14px" }}>
+                  <div style={{ fontSize: 11, color: "#475569", marginBottom: 8 }}>Cambiar estado:</div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {STATUSES.map(s => { const c = S_COLOR[s]; return (
+                      <button key={s} className="btn" onClick={() => changeStatus(s)}
+                        style={{ fontSize: 11, padding: "5px 11px", background: status === s ? c.bg : "#111c30", color: status === s ? c.text : "#475569", border: `1px solid ${status === s ? c.dot : "transparent"}` }}>{s}</button>
+                    ); })}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {tab === "ji" && (
           <div>
