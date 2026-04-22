@@ -1502,8 +1502,16 @@ export default function App() {
       {/* Sidebar */}
       <div style={{ width: sideOpen ? 224 : 58, background: "#070e1b", borderRight: "1px solid #111c30", display: "flex", flexDirection: "column", transition: "width .22s", overflow: "hidden", flexShrink: 0, position: "sticky", top: 0, height: "100vh" }}>
         <div style={{ padding: "16px 12px", borderBottom: "1px solid #111c30", display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 32, height: 32, background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>🔧</div>
-          {sideOpen && <div><div style={{ fontFamily: "Syne,sans-serif", fontSize: 14, fontWeight: 800, color: "#f1f5f9" }}>MantPRO</div><div style={{ fontSize: 9, color: "#334155" }}>CMMS INDUSTRIAL</div></div>}
+          <div style={{ flexShrink: 0 }}>
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect width="32" height="32" rx="6" fill="#0076BE"/>
+              <text x="4" y="23" fontFamily="Arial" fontWeight="900" fontSize="13" fill="white">xy</text>
+            </svg>
+          </div>
+          {sideOpen && <div>
+            <div style={{ fontFamily: "Arial, sans-serif", fontSize: 16, fontWeight: 900, color: "#0076BE", letterSpacing: "1px" }}>xylem</div>
+            <div style={{ fontSize: 9, color: "#334155", letterSpacing: "0.05em" }}>CMMS INDUSTRIAL</div>
+          </div>}
         </div>
         <nav style={{ padding: "10px 6px", flex: 1, display: "flex", flexDirection: "column", gap: 2, overflowY: "auto" }}>
           {NAV.map(n => (
