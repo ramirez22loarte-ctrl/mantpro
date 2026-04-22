@@ -943,10 +943,7 @@ function NewEquip({ locations, onClose, onSave }) {
             <Lbl l="Área"><input className="inp" placeholder="Área" value={f.area} onChange={e => s("area", e.target.value)} /></Lbl>
             <Lbl l="Sub-área"><input className="inp" placeholder="Sub-área" value={f.subarea} onChange={e => s("subarea", e.target.value)} /></Lbl>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <Lbl l="Disciplina"><select className="inp" value={f.discipline} onChange={e => s("discipline", e.target.value)}>{DISCIPLINES.map(d => <option key={d}>{d}</option>)}</select></Lbl>
-            <Lbl l="Estado"><select className="inp" value={f.status} onChange={e => s("status", e.target.value)}><option>Operativo</option><option>En mantenimiento</option><option>Fuera de servicio</option></select></Lbl>
-          </div>
+          <Lbl l="Estado"><select className="inp" value={f.status} onChange={e => s("status", e.target.value)}><option>Operativo</option><option>En mantenimiento</option><option>Fuera de servicio</option></select></Lbl>
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 }}>
             <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "8px 16px", fontSize: 13 }}>Cancelar</button>
             <button className="btn" onClick={submit} disabled={!f.code || saving} style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "8px 18px", fontSize: 13 }}>{saving ? "Guardando..." : "Guardar"}</button>
@@ -1359,10 +1356,7 @@ function EditEquip({ eq, onClose, onSave }) {
             <Lbl l="Área"><input className="inp" value={f.area} onChange={e => s("area", e.target.value)} /></Lbl>
             <Lbl l="Sub-área"><input className="inp" value={f.subarea} onChange={e => s("subarea", e.target.value)} /></Lbl>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <Lbl l="Disciplina"><select className="inp" value={f.discipline} onChange={e => s("discipline", e.target.value)}>{DISCIPLINES.map(d => <option key={d}>{d}</option>)}</select></Lbl>
-            <Lbl l="Estado"><select className="inp" value={f.status} onChange={e => s("status", e.target.value)}><option>Operativo</option><option>En mantenimiento</option><option>Fuera de servicio</option></select></Lbl>
-          </div>
+          <Lbl l="Estado"><select className="inp" value={f.status} onChange={e => s("status", e.target.value)}><option>Operativo</option><option>En mantenimiento</option><option>Fuera de servicio</option></select></Lbl>
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 }}>
             <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "8px 16px", fontSize: 13 }}>Cancelar</button>
             <button className="btn" onClick={submit} disabled={!f.code || saving} style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "8px 18px", fontSize: 13 }}>{saving ? "Guardando..." : "💾 Guardar"}</button>
@@ -1606,7 +1600,7 @@ export default function App() {
               </div>
               <div style={{ overflowX: "auto" }}>
                 <table className="ptable">
-                  <thead><tr>{["TAG / Código","Tipo","Área","Sub-área","Disciplina","Acciones"].map(h => <th key={h}>{h}</th>)}</tr></thead>
+                  <thead><tr>{["TAG / Código","Tipo","Área","Sub-área","Acciones"].map(h => <th key={h}>{h}</th>)}</tr></thead>
                   <tbody>
                     {equipment.map(eq => (
                       <tr key={eq.id}>
