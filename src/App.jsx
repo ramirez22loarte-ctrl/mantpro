@@ -109,7 +109,7 @@ const db = {
   async getParams(otId) { const { data } = await supabase.from("parameters").select("*").eq("ot_id", otId).order("sort_order"); return data || []; },
   async getReadings(otId) { const { data } = await supabase.from("readings").select("*, parameters(name, unit, sort_order)").eq("ot_id", otId).order("created_at"); return data || []; },
   async getComments(otId) { const { data } = await supabase.from("comments").select("*").eq("ot_id", otId).order("created_at"); return data || []; },
-  async getAllReadings() { const { data } = await supabase.from("readings").select("*, parameters(name, unit, sort_order), work_orders(id, discipline, title, status)").order("created_at", { ascending: false }); return data || []; },
+  async getAllReadings() { const { data } = await supabase.from("readings").select("*, parameters(name, unit, sort_order), work_orders(id, discipline, title, status, description, equipment_id)").order("created_at", { ascending: false }); return data || []; },
   async createLocation(loc) { const { data } = await supabase.from("locations").insert(loc).select().single(); return data; },
   async createEquipment(eq) { const { data } = await supabase.from("equipment").insert(eq).select().single(); return data; },
   async createJI(ji) { const { data } = await supabase.from("job_instructions").insert(ji).select().single(); return data; },
@@ -298,15 +298,18 @@ function ExcelImport({ onClose, onImported }) {
       const { data: existing } = await supabase.from("work_orders").select("id").eq("id", id).single();
       if (existing) { skip++; setStatus("Importando... " + (ok + skip + fail) + "/" + preview.length); continue; }
 
+      // Try to find equipment by TAG
+      const { data: eqData } = await supabase.from("equipment").select("id,area,subarea").eq("code", row.tag).single();
+
       const ot = {
         id,
         title: row.desc || ("OT " + id),
         discipline: row.disc,
         priority: "Media",
         status: "Abierta",
-        description: "Tag: " + row.tag + " | " + (row.desc || ""),
+        description: row.tag + "|" + (eqData?.area || "") + "|" + (eqData?.subarea || "") + "|" + (row.desc || ""),
         created_at: new Date().toISOString().split("T")[0],
-        equipment_id: null,
+        equipment_id: eqData?.id || null,
         location_id: null,
         assigned_to: null,
         job_instruction_id: null,
@@ -1114,23 +1117,33 @@ function DashboardOperativo({ allReadings, equipment }) {
       .filter(Boolean)
   )].sort();
 
-  // Helper: find equipment tag from OT description or title
-  // OT description format: "Tag: PPC075 | description" or title contains tag
+  // Helper: extract TAG from OT description field "TAG|AREA|SUBAREA|DESC"
   const getOTTag = (r) => {
     const desc = r.work_orders?.description || "";
+    const parts = desc.split("|");
+    if (parts[0] && parts[0].trim()) return parts[0].trim();
+    // Fallback: find equipment code in title
     const title = r.work_orders?.title || "";
-    // Try to extract tag from description "Tag: XXX |"
-    const tagMatch = desc.match(/Tag:\s*([^\s|]+)/i);
-    if (tagMatch) return tagMatch[1].toUpperCase();
-    // Try to find any equipment code in the title
-    const found = equipment.find(e => e.code && (title.toUpperCase().includes(e.code.toUpperCase())));
+    const found = equipment.find(e => e.code && title.toUpperCase().includes(e.code.toUpperCase()));
     return found?.code || "";
   };
 
   const getOTArea = (r) => {
+    const desc = r.work_orders?.description || "";
+    const parts = desc.split("|");
+    if (parts[1] && parts[1].trim()) return parts[1].trim();
     const tag = getOTTag(r);
     const eq = equipment.find(e => e.code === tag);
     return eq?.area || "";
+  };
+
+  const getOTSubarea = (r) => {
+    const desc = r.work_orders?.description || "";
+    const parts = desc.split("|");
+    if (parts[2] && parts[2].trim()) return parts[2].trim();
+    const tag = getOTTag(r);
+    const eq = equipment.find(e => e.code === tag);
+    return eq?.subarea || "";
   };
 
   // Filter readings
@@ -1146,9 +1159,7 @@ function DashboardOperativo({ allReadings, equipment }) {
       if (otArea !== filterArea) return false;
     }
     if (filterSubarea) {
-      const tag = getOTTag(r);
-      const eq = equipment.find(e => e.code === tag);
-      if ((eq?.subarea || "") !== filterSubarea) return false;
+      if (getOTSubarea(r) !== filterSubarea) return false;
     }
     return true;
   });
@@ -1312,6 +1323,51 @@ function ImportEquip({ onClose, onSave }) {
           </div>
         )}
         {done && <div style={{ display: "flex", justifyContent: "flex-end" }}><button className="btn" onClick={onClose} style={{ background: "#0f2040", color: "#60a5fa", padding: "8px 18px", fontSize: 13 }}>Cerrar</button></div>}
+      </div>
+    </div>
+  );
+}
+
+
+// ── EDIT EQUIPMENT ────────────────────────────────────────────
+function EditEquip({ eq, onClose, onSave }) {
+  const [f, setF] = useState({ code: eq.code || "", name: eq.name || "", type: eq.type || "", area: eq.area || "", subarea: eq.subarea || "", discipline: eq.discipline || "Mecánico", status: eq.status || "Operativo" });
+  const [saving, setSaving] = useState(false);
+  const s = (k, v) => setF(p => ({ ...p, [k]: v }));
+
+  const submit = async () => {
+    setSaving(true);
+    const { data } = await supabase.from("equipment").update({ ...f, name: f.code }).eq("id", eq.id).select().single();
+    if (data) onSave(data);
+    setSaving(false);
+    onClose();
+  };
+
+  return (
+    <div className="ov" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="mod fd" style={{ width: 480 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 18 }}>
+          <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 16, color: "#f1f5f9" }}>✏️ Editar Equipo</div>
+          <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "5px 11px" }}>✕</button>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <Lbl l="TAG / Código"><input className="inp" value={f.code} onChange={e => s("code", e.target.value)} /></Lbl>
+            <Lbl l="Tipo"><input className="inp" value={f.type} onChange={e => s("type", e.target.value)} /></Lbl>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <Lbl l="Área"><input className="inp" value={f.area} onChange={e => s("area", e.target.value)} /></Lbl>
+            <Lbl l="Sub-área"><input className="inp" value={f.subarea} onChange={e => s("subarea", e.target.value)} /></Lbl>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <Lbl l="Disciplina"><select className="inp" value={f.discipline} onChange={e => s("discipline", e.target.value)}>{DISCIPLINES.map(d => <option key={d}>{d}</option>)}</select></Lbl>
+            <Lbl l="Estado"><select className="inp" value={f.status} onChange={e => s("status", e.target.value)}><option>Operativo</option><option>En mantenimiento</option><option>Fuera de servicio</option></select></Lbl>
+          </div>
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 }}>
+            <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "8px 16px", fontSize: 13 }}>Cancelar</button>
+            <button className="btn" onClick={submit} disabled={!f.code || saving} style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "8px 18px", fontSize: 13 }}>{saving ? "Guardando..." : "💾 Guardar"}</button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1559,12 +1615,14 @@ export default function App() {
                         <td style={{ color: "#94a3b8" }}>{eq.area || "—"}</td>
                         <td style={{ color: "#94a3b8" }}>{eq.subarea || "—"}</td>
                         <td><span style={{ color: D_COLOR[eq.discipline], fontSize: 12 }}>{D_ICON[eq.discipline]} {eq.discipline}</span></td>
-                        <td>
+                        <td style={{ display: "flex", gap: 6 }}>
+                          <button className="btn" onClick={() => { setSelOT({ ...eq, _editEquip: true }); setModal("editEquip"); }}
+                            style={{ background: "#0f2040", color: "#60a5fa", padding: "3px 10px", fontSize: 11 }}>✏️ Editar</button>
                           <button className="btn" onClick={async () => {
                             if (!window.confirm("¿Eliminar equipo " + eq.code + "?")) return;
                             await supabase.from("equipment").delete().eq("id", eq.id);
                             setEquipment(prev => prev.filter(e => e.id !== eq.id));
-                          }} style={{ background: "#3b0f0f", color: "#f87171", padding: "3px 10px", fontSize: 11 }}>Eliminar</button>
+                          }} style={{ background: "#3b0f0f", color: "#f87171", padding: "3px 10px", fontSize: 11 }}>🗑️</button>
                         </td>
                       </tr>
                     ))}
@@ -1861,6 +1919,7 @@ export default function App() {
       {modal === "newUser" && <NewUser onClose={closeModal} onSave={u => { setUsers(p => [...p, u]); closeModal(); }} />}
       {modal === "importExcel" && <ExcelImport onClose={closeModal} onImported={async () => { const data = await db.getOTs(user.id, isAdmin); setOts(data); }} />}
       {modal === "importEquip" && <ImportEquip onClose={closeModal} onSave={eq => setEquipment(p => [...p, eq])} />}
+      {modal === "editEquip" && selOT && <EditEquip eq={selOT} onClose={closeModal} onSave={updated => setEquipment(p => p.map(e => e.id === updated.id ? updated : e))} />}
       {modal === "searchOT" && <TechOTSearch user={user} onFound={ot => { setSelOT(ot); setModal("otDetail"); }} />}
     </div>
   );
