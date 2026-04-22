@@ -1190,49 +1190,16 @@ function DashboardOperativo({ allReadings, equipment }) {
   // Build filter options from data
   const fechas = [...new Set(allReadings.map(r => r.created_at ? new Date(r.created_at).toLocaleDateString("es-CO") : "").filter(Boolean))].sort().reverse();
 
-  // Build OT info index once per allReadings change
-  const otInfoIndex = useMemo(() => {
-    const idx = {};
-    // Get unique OTs only
-    const uniqueOTs = {};
-    allReadings.forEach(r => {
-      if (r.ot_id && !uniqueOTs[r.ot_id]) uniqueOTs[r.ot_id] = r.work_orders;
-    });
-    Object.entries(uniqueOTs).forEach(([otId, wo]) => {
-      const desc = (wo?.description || "");
-      let tag = "", area = "", subarea = "";
-      // Format: "TAG|AREA|SUBAREA|..." or "Tag: TAG | ..."
-      const oldMatch = desc.match(/^Tag:\s*([^|\s]+)/i);
-      if (oldMatch) {
-        tag = oldMatch[1].trim().toUpperCase();
-      } else {
-        const parts = desc.split("|");
-        tag = (parts[0]?.trim() || "").toUpperCase();
-        area = parts[1]?.trim() || "";
-        subarea = parts[2]?.trim() || "";
-      }
-      // Fallback to equipment table for area/subarea
-      if (!area && tag) {
-        const eq = equipment.find(e => e.code && e.code.toUpperCase() === tag);
-        area = eq?.area || "";
-        subarea = eq?.subarea || "";
-      }
-      idx[otId] = { tag, area, subarea };
-    });
-    return idx;
-  }, [allReadings, equipment]);
-
-  const areas = [...new Set(Object.values(otInfoIndex).map(o => o.area).filter(Boolean))].sort();
+  // Cascading filters from equipment table
+  const areas = [...new Set(equipment.map(e => e.area).filter(Boolean))].sort();
   const tags = [...new Set(
-    Object.values(otInfoIndex)
-      .filter(o => !filterArea || o.area === filterArea)
-      .map(o => o.tag).filter(Boolean)
+    equipment.filter(e => !filterArea || e.area === filterArea).map(e => e.code).filter(Boolean)
   )].sort();
   const subareas = [...new Set(
-    Object.values(otInfoIndex)
-      .filter(o => !filterArea || o.area === filterArea)
-      .filter(o => !filterTag || o.tag === filterTag)
-      .map(o => o.subarea).filter(Boolean)
+    equipment
+      .filter(e => !filterArea || e.area === filterArea)
+      .filter(e => !filterTag || e.code === filterTag)
+      .map(e => e.subarea).filter(Boolean)
   )].sort();
 
   // Helper: extract TAG from OT description
@@ -1271,16 +1238,22 @@ function DashboardOperativo({ allReadings, equipment }) {
   // Build tag/area/subarea lists from ALL readings (not just equipment table)
   // This ensures historical data appears in filters even without equipment record
 
-  // Filter readings using pre-built index
-  const filtered = useMemo(() => allReadings.filter(r => {
+  // Filter readings
+  const filtered = allReadings.filter(r => {
     const fecha = r.created_at ? new Date(r.created_at).toLocaleDateString("es-CO") : "";
     if (filterFecha && fecha !== filterFecha) return false;
-    const info = otInfoIndex[r.ot_id] || {};
-    if (filterTag && info.tag !== filterTag) return false;
-    if (filterArea && info.area !== filterArea) return false;
-    if (filterSubarea && info.subarea !== filterSubarea) return false;
+    if (filterTag || filterArea || filterSubarea) {
+      const desc = r.work_orders?.description || "";
+      const parts = desc.split("|");
+      const tag = (parts[0]?.trim() || "").toUpperCase();
+      const area = parts[1]?.trim() || "";
+      const subarea = parts[2]?.trim() || "";
+      if (filterTag && tag !== filterTag) return false;
+      if (filterArea && area !== filterArea) return false;
+      if (filterSubarea && subarea !== filterSubarea) return false;
+    }
     return true;
-  }), [allReadings, otInfoIndex, filterFecha, filterTag, filterArea, filterSubarea]);
+  });
 
   const total = filtered.length;
   const mec = filtered.filter(r => r.work_orders?.discipline === "Mecánico").length;
