@@ -2005,12 +2005,26 @@ export default function App() {
             });
             const otList = Object.entries(grouped);
 
-            const downloadOTPDF = (otId, g) => {
+            const downloadOTPDF = async (otId, g) => {
+              // Fetch comments for this OT from Supabase
+              const { data: otComments } = await supabase.from("comments").select("*").eq("ot_id", otId).order("created_at");
+
               const rows = g.readings.map(r =>
                 "<tr><td style='padding:7px 12px;border-bottom:1px solid #eee;font-weight:500'>" + (r.parameters?.name || "—") + " (" + (r.parameters?.unit || "") + ")</td>" +
                 "<td style='padding:7px 12px;border-bottom:1px solid #eee;color:#065f46;font-weight:700'>" + r.value + " " + (r.parameters?.unit || "") + "</td>" +
                 "<td style='padding:7px 12px;border-bottom:1px solid #eee;color:#666;font-size:11px'>" + (r.created_at ? new Date(r.created_at).toLocaleString("es-CO") : "—") + "</td></tr>"
               ).join("");
+
+              const commentRows = (otComments || []).length > 0
+                ? "<h3 style='font-size:13px;color:#0076BE;border-bottom:2px solid #0076BE;padding-bottom:4px;margin:20px 0 10px'>💬 Comentarios</h3>" +
+                  "<table><thead><tr><th style='width:150px'>Fecha</th><th style='width:150px'>Técnico</th><th>Comentario</th></tr></thead><tbody>" +
+                  (otComments || []).map(c =>
+                    "<tr><td style='padding:7px 12px;border-bottom:1px solid #eee;color:#666;font-size:11px'>" + (c.created_at ? new Date(c.created_at).toLocaleString("es-CO") : "—") + "</td>" +
+                    "<td style='padding:7px 12px;border-bottom:1px solid #eee;font-weight:500'>" + (c.author || "Técnico") + "</td>" +
+                    "<td style='padding:7px 12px;border-bottom:1px solid #eee'>" + (c.text || "") + "</td></tr>"
+                  ).join("") + "</tbody></table>"
+                : "<p style='color:#999;font-size:12px;margin-top:16px'>Sin comentarios registrados.</p>";
+
               const w = window.open("", "_blank");
               w.document.write(
                 "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>OT " + otId + "</title>" +
@@ -2024,6 +2038,7 @@ export default function App() {
                 "<p style='font-size:13px;color:#333;margin-bottom:16px'>" + g.title + "</p>" +
                 "<h3 style='font-size:13px;color:#0076BE;border-bottom:2px solid #0076BE;padding-bottom:4px;margin-bottom:10px'>Parámetros Medidos</h3>" +
                 "<table><thead><tr><th>Parámetro</th><th>Valor Registrado</th><th>Fecha / Hora</th></tr></thead><tbody>" + rows + "</tbody></table>" +
+                commentRows +
                 "<div style='margin-top:30px;padding-top:12px;border-top:1px solid #eee;display:flex;justify-content:space-between;font-size:11px;color:#666'>" +
                 "<div>MantPRO — Xylem · Sistema de Gestión de Mantenimiento</div><div>Fecha impresión: " + new Date().toLocaleDateString("es-CO") + "</div></div>" +
                 "<script>window.onload=()=>window.print()<\/script></body></html>"
