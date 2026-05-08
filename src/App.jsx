@@ -507,7 +507,7 @@ function Login({ onLogin }) {
 }
 
 // ── OT ROW ───────────────────────────────────────────────────
-function OTRow({ ot, equipment, onClick, onDelete }) {
+function OTRow({ ot, equipment, onClick, onDelete, onEdit }) {
   const eq = equipment.find(e => e.id === ot.equipment_id);
   return (
     <div className="row" onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 12, position: "relative" }}>
@@ -522,6 +522,12 @@ function OTRow({ ot, equipment, onClick, onDelete }) {
         <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>{eq?.name || "—"} · Vence: {ot.due_date || "—"}</div>
       </div>
       <div style={{ fontSize: 20, flexShrink: 0 }}>{D_ICON[ot.discipline]}</div>
+      {onEdit && (
+        <button className="btn" onClick={e => { e.stopPropagation(); onEdit(ot); }}
+          style={{ background: "#0f2040", color: "#60a5fa", padding: "4px 10px", fontSize: 11, flexShrink: 0 }}>
+          ✏️
+        </button>
+      )}
       {onDelete && (
         <button className="btn" onClick={e => { e.stopPropagation(); onDelete(ot.id); }}
           style={{ background: "#3b0f0f", color: "#f87171", padding: "4px 10px", fontSize: 11, flexShrink: 0 }}>
@@ -986,7 +992,8 @@ function NewOT({ equipment, locations, jis, users, onClose, onSave }) {
             <Lbl l="Equipo"><select className="inp" value={f.equipment_id} onChange={e => s("equipment_id", e.target.value)}><option value="">Seleccionar</option>{equipment.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}</select></Lbl>
             <Lbl l="Ubicación"><select className="inp" value={f.location_id} onChange={e => s("location_id", e.target.value)}><option value="">Seleccionar</option>{locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select></Lbl>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <Lbl l="Técnico"><select className="inp" value={f.assigned_to} onChange={e => s("assigned_to", e.target.value)}><option value="">Seleccionar</option>{users.filter(u => u.role === "tecnico").map(u => <option key={u.id} value={u.id}>{u.name} ({u.discipline})</option>)}</select></Lbl>
             <Lbl l="Fecha límite"><input className="inp" type="date" value={f.due_date} onChange={e => s("due_date", e.target.value)} /></Lbl>
           </div>
           <Lbl l="Job Instruction"><select className="inp" value={f.job_instruction_id} onChange={e => s("job_instruction_id", e.target.value)}><option value="">Sin instrucción</option>{jis.map(j => <option key={j.id} value={j.id}>{j.code} — {j.title}</option>)}</select></Lbl>
@@ -1897,6 +1904,81 @@ function AvisosPage() {
     </div>
   );
 }
+
+// ── EDIT OT MODAL ─────────────────────────────────────────────
+function EditOT({ ot, equipment, jis, onClose, onSave }) {
+  const [f, setF] = useState({
+    title: ot.title || "",
+    discipline: ot.discipline || "Mecánico",
+    priority: ot.priority || "Media",
+    status: ot.status || "Abierta",
+    due_date: ot.due_date || "",
+    description: ot.description || "",
+    equipment_id: ot.equipment_id || "",
+    job_instruction_id: ot.job_instruction_id || "",
+  });
+  const [saving, setSaving] = useState(false);
+  const s = (k, v) => setF(p => ({ ...p, [k]: v }));
+
+  const submit = async () => {
+    if (!f.title) return;
+    setSaving(true);
+    const { data } = await supabase.from("work_orders").update({
+      title: f.title,
+      discipline: f.discipline,
+      priority: f.priority,
+      status: f.status,
+      due_date: f.due_date || null,
+      description: f.description,
+      equipment_id: parseInt(f.equipment_id) || null,
+      job_instruction_id: parseInt(f.job_instruction_id) || null,
+    }).eq("id", ot.id).select().single();
+    if (data) onSave(data);
+    setSaving(false);
+    onClose();
+  };
+
+  return (
+    <div className="ov" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="mod fd">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+          <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 16, color: "#f1f5f9" }}>✏️ Editar OT — <span style={{ color: "#3b82f6" }}>{ot.id}</span></div>
+          <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "5px 11px" }}>✕</button>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+          <Lbl l="Título *"><input className="inp" value={f.title} onChange={e => s("title", e.target.value)} /></Lbl>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <Lbl l="Disciplina"><select className="inp" value={f.discipline} onChange={e => s("discipline", e.target.value)}>{DISCIPLINES.map(d => <option key={d}>{d}</option>)}</select></Lbl>
+            <Lbl l="Prioridad"><select className="inp" value={f.priority} onChange={e => s("priority", e.target.value)}>{PRIORITIES.map(p => <option key={p}>{p}</option>)}</select></Lbl>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <Lbl l="Estado"><select className="inp" value={f.status} onChange={e => s("status", e.target.value)}>{STATUSES.map(s => <option key={s}>{s}</option>)}</select></Lbl>
+            <Lbl l="Fecha límite"><input className="inp" type="date" value={f.due_date} onChange={e => s("due_date", e.target.value)} /></Lbl>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <Lbl l="Equipo"><select className="inp" value={f.equipment_id} onChange={e => s("equipment_id", e.target.value)}>
+              <option value="">Sin equipo</option>
+              {equipment.map(e => <option key={e.id} value={e.id}>{e.code || e.name}</option>)}
+            </select></Lbl>
+            <Lbl l="Job Instruction"><select className="inp" value={f.job_instruction_id} onChange={e => s("job_instruction_id", e.target.value)}>
+              <option value="">Sin instrucción</option>
+              {jis.map(j => <option key={j.id} value={j.id}>{j.code} — {j.title}</option>)}
+            </select></Lbl>
+          </div>
+          <Lbl l="Descripción"><textarea className="inp" rows={3} value={f.description} onChange={e => s("description", e.target.value)} style={{ resize: "vertical" }} /></Lbl>
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 }}>
+            <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "8px 16px", fontSize: 13 }}>Cancelar</button>
+            <button className="btn" onClick={submit} disabled={!f.title || saving}
+              style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "8px 20px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+              {saving ? <><div className="spin" /> Guardando...</> : "💾 Guardar cambios"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [locations, setLocations] = useState([]);
@@ -1908,6 +1990,7 @@ export default function App() {
   const [page, setPage] = useState("dashboard");
   const [selOT, setSelOT] = useState(null);
   const [modal, setModal] = useState(null);
+  const [editOTData, setEditOTData] = useState(null);
   const [sideOpen, setSideOpen] = useState(true);
   const [loading, setLoading] = useState(false);
   const [filterOTDisc, setFilterOTDisc] = useState("");
@@ -1949,7 +2032,7 @@ export default function App() {
     crit: myOTs.filter(o => o.priority === "Crítica").length,
   };
 
-  const closeModal = () => { setModal(null); setSelOT(null); };
+  const closeModal = () => { setModal(null); setSelOT(null); setEditOTData(null); };
 
   // Refresh readings when navigating to verification page
   const handlePageChange = async (p) => {
@@ -2061,7 +2144,7 @@ export default function App() {
                 </div>
               )}
               <div style={{ fontSize: 11, fontWeight: 600, color: "#334155", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Órdenes Recientes</div>
-              {myOTs.slice(0, 5).map(ot => <OTRow key={ot.id} ot={ot} equipment={equipment} onClick={() => { setSelOT(ot); setModal("otDetail"); }} />)}
+              {myOTs.slice(0, 5).map(ot => <OTRow key={ot.id} ot={ot} equipment={equipment} onClick={() => { setSelOT(ot); setModal("otDetail"); }} onEdit={isAdmin ? (ot) => { setEditOTData(ot); setModal("editOT"); } : null} />)}
             </div>
           )}
 
@@ -2117,6 +2200,7 @@ export default function App() {
                     <div style={{ flex: 1 }}>
                       <OTRow ot={ot} equipment={equipment}
                         onClick={() => { setSelOT(ot); setModal("otDetail"); }}
+                        onEdit={isAdmin ? (ot) => { setEditOTData(ot); setModal("editOT"); } : null}
                         onDelete={isAdmin ? async (id) => {
                           if (!window.confirm("¿Eliminar OT " + id + "?")) return;
                           await db.deleteOT(id);
@@ -2501,6 +2585,7 @@ export default function App() {
       {modal === "importEquip" && <ImportEquip onClose={closeModal} onSave={eq => setEquipment(p => [...p, eq])} />}
       {modal === "editEquip" && selOT && <EditEquip eq={selOT} onClose={closeModal} onSave={updated => setEquipment(p => p.map(e => e.id === updated.id ? updated : e))} />}
       {modal === "searchOT" && <TechOTSearch user={user} onFound={ot => { setSelOT(ot); setModal("otDetail"); }} onClose={closeModal} />}
+      {modal === "editOT" && editOTData && <EditOT ot={editOTData} equipment={equipment} jis={jis} onClose={closeModal} onSave={updated => { setOts(prev => prev.map(o => o.id === updated.id ? updated : o)); closeModal(); }} />}
     </div>
   );
 }
