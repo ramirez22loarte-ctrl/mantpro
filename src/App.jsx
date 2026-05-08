@@ -1662,7 +1662,242 @@ function ImportHistorico({ equipment }) {
     </div>
   );
 }
+// ── SOLPED Y REPUESTOS ────────────────────────────────────────
+const SOLPED_ESTADOS = ["Pendiente", "En Proceso", "Completado", "Cancelado"];
+const SOLPED_PRIORIDADES = ["Alta", "Media", "Baja"];
 
+function SolpedPage() {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const empty = { tipo: "Repuesto", area: "", solped: "", actividad: "", avances: "", prioridad: "Media", avance_pct: 0, estado: "Pendiente", fecha_inicio: "", fecha_fin: "" };
+  const [form, setForm] = useState(empty);
+  const [editId, setEditId] = useState(null);
+  const s = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
+  useEffect(() => {
+    supabase.from("solped").select("*").order("created_at", { ascending: false }).then(({ data }) => {
+      setItems(data || []); setLoading(false);
+    });
+  }, []);
+
+  const save = async () => {
+    if (editId) {
+      const { data } = await supabase.from("solped").update(form).eq("id", editId).select().single();
+      if (data) setItems(p => p.map(x => x.id === editId ? data : x));
+    } else {
+      const { data } = await supabase.from("solped").insert(form).select().single();
+      if (data) setItems(p => [data, ...p]);
+    }
+    setForm(empty); setEditId(null); setShowForm(false);
+  };
+
+  const del = async (id) => {
+    if (!window.confirm("¿Eliminar este registro?")) return;
+    await supabase.from("solped").delete().eq("id", id);
+    setItems(p => p.filter(x => x.id !== id));
+  };
+
+  return (
+    <div className="fd">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <div style={{ fontFamily: "Syne,sans-serif", fontSize: 15, fontWeight: 700, color: "#f1f5f9" }}>🔧 Seguimiento de SOLPED y Repuestos</div>
+        <button className="btn" onClick={() => { setForm(empty); setEditId(null); setShowForm(true); }} style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "7px 16px", fontSize: 13 }}>+ Agregar</button>
+      </div>
+
+      {showForm && (
+        <div className="ov" onClick={e => e.target === e.currentTarget && setShowForm(false)}>
+          <div className="mod fd" style={{ width: 620 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
+              <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 15, color: "#f1f5f9" }}>{editId ? "Editar" : "Nuevo"} Registro</div>
+              <button className="btn" onClick={() => setShowForm(false)} style={{ background: "#111c30", color: "#64748b", padding: "4px 10px" }}>✕</button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <Lbl l="Repuestos / Otros">
+                  <select className="inp" value={form.tipo} onChange={e => s("tipo", e.target.value)}>
+                    <option>Repuesto</option><option>Otro</option>
+                  </select>
+                </Lbl>
+                <Lbl l="Área de Pedido"><input className="inp" value={form.area} onChange={e => s("area", e.target.value)} placeholder="Área" /></Lbl>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <Lbl l="N° de Solped"><input className="inp" value={form.solped} onChange={e => s("solped", e.target.value)} placeholder="N° Solped" /></Lbl>
+                <Lbl l="Prioridad"><select className="inp" value={form.prioridad} onChange={e => s("prioridad", e.target.value)}>{SOLPED_PRIORIDADES.map(p => <option key={p}>{p}</option>)}</select></Lbl>
+              </div>
+              <Lbl l="Actividad"><input className="inp" value={form.actividad} onChange={e => s("actividad", e.target.value)} placeholder="Descripción de actividad" /></Lbl>
+              <Lbl l="Avances / Histórico"><textarea className="inp" rows={2} value={form.avances} onChange={e => s("avances", e.target.value)} style={{ resize: "vertical" }} /></Lbl>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+                <Lbl l="Avance %"><input className="inp" type="number" min="0" max="100" value={form.avance_pct} onChange={e => s("avance_pct", e.target.value)} /></Lbl>
+                <Lbl l="Estado"><select className="inp" value={form.estado} onChange={e => s("estado", e.target.value)}>{SOLPED_ESTADOS.map(e => <option key={e}>{e}</option>)}</select></Lbl>
+                <div />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <Lbl l="Fecha de Inicio"><input className="inp" type="date" value={form.fecha_inicio} onChange={e => s("fecha_inicio", e.target.value)} /></Lbl>
+                <Lbl l="Fecha de Fin"><input className="inp" type="date" value={form.fecha_fin} onChange={e => s("fecha_fin", e.target.value)} /></Lbl>
+              </div>
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                <button className="btn" onClick={() => setShowForm(false)} style={{ background: "#111c30", color: "#64748b", padding: "8px 16px", fontSize: 13 }}>Cancelar</button>
+                <button className="btn" onClick={save} style={{ background: "linear-gradient(135deg,#065f46,#0f766e)", color: "#34d399", padding: "8px 18px", fontSize: 13 }}>💾 Guardar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {loading ? <div style={{ color: "#475569", textAlign: "center", padding: 40 }}>Cargando...</div> : (
+        <div style={{ overflowX: "auto" }}>
+          <table className="ptable">
+            <thead><tr>{["Tipo","Área","N° Solped","Actividad","Avances","Prioridad","Avance %","Estado","F. Inicio","F. Fin","Acciones"].map(h => <th key={h}>{h}</th>)}</tr></thead>
+            <tbody>
+              {items.length === 0 ? <tr><td colSpan={11} style={{ textAlign: "center", color: "#334155", padding: 24 }}>Sin registros aún.</td></tr> :
+              items.map(item => (
+                <tr key={item.id}>
+                  <td style={{ color: "#60a5fa" }}>{item.tipo}</td>
+                  <td style={{ color: "#94a3b8" }}>{item.area}</td>
+                  <td style={{ color: "#3b82f6", fontWeight: 700 }}>{item.solped}</td>
+                  <td style={{ color: "#cbd5e1" }}>{item.actividad}</td>
+                  <td style={{ color: "#94a3b8", fontSize: 11 }}>{item.avances}</td>
+                  <td style={{ color: P_COLOR[item.prioridad] || "#64748b", fontWeight: 600 }}>{item.prioridad}</td>
+                  <td>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <div style={{ background: "#111c30", borderRadius: 99, height: 6, width: 60, overflow: "hidden" }}>
+                        <div style={{ height: "100%", background: item.avance_pct >= 100 ? "#34d399" : "#3b82f6", width: item.avance_pct + "%" }} />
+                      </div>
+                      <span style={{ fontSize: 11, color: "#64748b" }}>{item.avance_pct}%</span>
+                    </div>
+                  </td>
+                  <td><span className="tag" style={{ background: item.estado === "Completado" ? "#1e3a2a" : item.estado === "Cancelado" ? "#3b0f0f" : item.estado === "En Proceso" ? "#1e2a3a" : "#2a2a1e", color: item.estado === "Completado" ? "#34d399" : item.estado === "Cancelado" ? "#f87171" : item.estado === "En Proceso" ? "#60a5fa" : "#fbbf24" }}>{item.estado}</span></td>
+                  <td style={{ color: "#475569", fontSize: 11 }}>{item.fecha_inicio}</td>
+                  <td style={{ color: "#475569", fontSize: 11 }}>{item.fecha_fin}</td>
+                  <td style={{ display: "flex", gap: 5 }}>
+                    <button className="btn" onClick={() => { setForm({ tipo: item.tipo, area: item.area, solped: item.solped, actividad: item.actividad, avances: item.avances, prioridad: item.prioridad, avance_pct: item.avance_pct, estado: item.estado, fecha_inicio: item.fecha_inicio || "", fecha_fin: item.fecha_fin || "" }); setEditId(item.id); setShowForm(true); }} style={{ background: "#0f2040", color: "#60a5fa", padding: "3px 9px", fontSize: 11 }}>✏️</button>
+                    <button className="btn" onClick={() => del(item.id)} style={{ background: "#3b0f0f", color: "#f87171", padding: "3px 9px", fontSize: 11 }}>🗑️</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── AVISOS ────────────────────────────────────────────────────
+function AvisosPage() {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const empty = { area: "", ot_aviso: "", n_aviso: "", actividad: "", acciones: "", prioridad: "Media", avance_pct: 0, estado: "Pendiente", fecha_reporte: "", fecha_fin: "" };
+  const [form, setForm] = useState(empty);
+  const [editId, setEditId] = useState(null);
+  const s = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
+  useEffect(() => {
+    supabase.from("avisos").select("*").order("created_at", { ascending: false }).then(({ data }) => {
+      setItems(data || []); setLoading(false);
+    });
+  }, []);
+
+  const save = async () => {
+    if (editId) {
+      const { data } = await supabase.from("avisos").update(form).eq("id", editId).select().single();
+      if (data) setItems(p => p.map(x => x.id === editId ? data : x));
+    } else {
+      const { data } = await supabase.from("avisos").insert(form).select().single();
+      if (data) setItems(p => [data, ...p]);
+    }
+    setForm(empty); setEditId(null); setShowForm(false);
+  };
+
+  const del = async (id) => {
+    if (!window.confirm("¿Eliminar este aviso?")) return;
+    await supabase.from("avisos").delete().eq("id", id);
+    setItems(p => p.filter(x => x.id !== id));
+  };
+
+  return (
+    <div className="fd">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <div style={{ fontFamily: "Syne,sans-serif", fontSize: 15, fontWeight: 700, color: "#f1f5f9" }}>🔔 Seguimiento de Avisos</div>
+        <button className="btn" onClick={() => { setForm(empty); setEditId(null); setShowForm(true); }} style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "7px 16px", fontSize: 13 }}>+ Agregar</button>
+      </div>
+
+      {showForm && (
+        <div className="ov" onClick={e => e.target === e.currentTarget && setShowForm(false)}>
+          <div className="mod fd" style={{ width: 620 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
+              <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 15, color: "#f1f5f9" }}>{editId ? "Editar" : "Nuevo"} Aviso</div>
+              <button className="btn" onClick={() => setShowForm(false)} style={{ background: "#111c30", color: "#64748b", padding: "4px 10px" }}>✕</button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <Lbl l="Área de Reporte"><input className="inp" value={form.area} onChange={e => s("area", e.target.value)} placeholder="Área" /></Lbl>
+                <Lbl l="OT del Aviso"><input className="inp" value={form.ot_aviso} onChange={e => s("ot_aviso", e.target.value)} placeholder="N° OT" /></Lbl>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <Lbl l="N° de Aviso"><input className="inp" value={form.n_aviso} onChange={e => s("n_aviso", e.target.value)} placeholder="N° Aviso" /></Lbl>
+                <Lbl l="Prioridad"><select className="inp" value={form.prioridad} onChange={e => s("prioridad", e.target.value)}>{SOLPED_PRIORIDADES.map(p => <option key={p}>{p}</option>)}</select></Lbl>
+              </div>
+              <Lbl l="Actividad del Aviso"><input className="inp" value={form.actividad} onChange={e => s("actividad", e.target.value)} placeholder="Descripción" /></Lbl>
+              <Lbl l="Acciones Tomadas del Aviso"><textarea className="inp" rows={2} value={form.acciones} onChange={e => s("acciones", e.target.value)} style={{ resize: "vertical" }} /></Lbl>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+                <Lbl l="Avance %"><input className="inp" type="number" min="0" max="100" value={form.avance_pct} onChange={e => s("avance_pct", e.target.value)} /></Lbl>
+                <Lbl l="Estado"><select className="inp" value={form.estado} onChange={e => s("estado", e.target.value)}>{SOLPED_ESTADOS.map(e => <option key={e}>{e}</option>)}</select></Lbl>
+                <div />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <Lbl l="Fecha de Reporte"><input className="inp" type="date" value={form.fecha_reporte} onChange={e => s("fecha_reporte", e.target.value)} /></Lbl>
+                <Lbl l="Fecha de Fin de Aviso"><input className="inp" type="date" value={form.fecha_fin} onChange={e => s("fecha_fin", e.target.value)} /></Lbl>
+              </div>
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                <button className="btn" onClick={() => setShowForm(false)} style={{ background: "#111c30", color: "#64748b", padding: "8px 16px", fontSize: 13 }}>Cancelar</button>
+                <button className="btn" onClick={save} style={{ background: "linear-gradient(135deg,#065f46,#0f766e)", color: "#34d399", padding: "8px 18px", fontSize: 13 }}>💾 Guardar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {loading ? <div style={{ color: "#475569", textAlign: "center", padding: 40 }}>Cargando...</div> : (
+        <div style={{ overflowX: "auto" }}>
+          <table className="ptable">
+            <thead><tr>{["Área","OT Aviso","N° Aviso","Actividad","Acciones Tomadas","Prioridad","Avance %","Estado","F. Reporte","F. Fin","Acciones"].map(h => <th key={h}>{h}</th>)}</tr></thead>
+            <tbody>
+              {items.length === 0 ? <tr><td colSpan={11} style={{ textAlign: "center", color: "#334155", padding: 24 }}>Sin avisos aún.</td></tr> :
+              items.map(item => (
+                <tr key={item.id}>
+                  <td style={{ color: "#94a3b8" }}>{item.area}</td>
+                  <td style={{ color: "#3b82f6", fontWeight: 700 }}>{item.ot_aviso}</td>
+                  <td style={{ color: "#60a5fa", fontWeight: 700 }}>{item.n_aviso}</td>
+                  <td style={{ color: "#cbd5e1" }}>{item.actividad}</td>
+                  <td style={{ color: "#94a3b8", fontSize: 11 }}>{item.acciones}</td>
+                  <td style={{ color: P_COLOR[item.prioridad] || "#64748b", fontWeight: 600 }}>{item.prioridad}</td>
+                  <td>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <div style={{ background: "#111c30", borderRadius: 99, height: 6, width: 60, overflow: "hidden" }}>
+                        <div style={{ height: "100%", background: item.avance_pct >= 100 ? "#34d399" : "#3b82f6", width: item.avance_pct + "%" }} />
+                      </div>
+                      <span style={{ fontSize: 11, color: "#64748b" }}>{item.avance_pct}%</span>
+                    </div>
+                  </td>
+                  <td><span className="tag" style={{ background: item.estado === "Completado" ? "#1e3a2a" : item.estado === "Cancelado" ? "#3b0f0f" : item.estado === "En Proceso" ? "#1e2a3a" : "#2a2a1e", color: item.estado === "Completado" ? "#34d399" : item.estado === "Cancelado" ? "#f87171" : item.estado === "En Proceso" ? "#60a5fa" : "#fbbf24" }}>{item.estado}</span></td>
+                  <td style={{ color: "#475569", fontSize: 11 }}>{item.fecha_reporte}</td>
+                  <td style={{ color: "#475569", fontSize: 11 }}>{item.fecha_fin}</td>
+                  <td style={{ display: "flex", gap: 5 }}>
+                    <button className="btn" onClick={() => { setForm({ area: item.area, ot_aviso: item.ot_aviso, n_aviso: item.n_aviso, actividad: item.actividad, acciones: item.acciones, prioridad: item.prioridad, avance_pct: item.avance_pct, estado: item.estado, fecha_reporte: item.fecha_reporte || "", fecha_fin: item.fecha_fin || "" }); setEditId(item.id); setShowForm(true); }} style={{ background: "#0f2040", color: "#60a5fa", padding: "3px 9px", fontSize: 11 }}>✏️</button>
+                    <button className="btn" onClick={() => del(item.id)} style={{ background: "#3b0f0f", color: "#f87171", padding: "3px 9px", fontSize: 11 }}>🗑️</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
 export default function App() {
   const [user, setUser] = useState(null);
   const [locations, setLocations] = useState([]);
@@ -1737,6 +1972,8 @@ export default function App() {
     { k: "dashboard_op", i: "📡", l: "Dashboard Operativo" },
     { k: "verificacion", i: "✅", l: "Verificación" },
     { k: "historico", i: "📥", l: "Importar Histórico" },
+    { k: "solped", i: "🔧", l: "SOLPED y Repuestos" },
+    { k: "avisos", i: "🔔", l: "Seguimiento Avisos" },
     { k: "users", i: "👥", l: "Usuarios" },
   ];
   const TECH_NAV = [
@@ -1995,6 +2232,8 @@ export default function App() {
 
           {page === "dashboard_op" && isAdmin && <DashboardOperativo allReadings={allReadings} equipment={equipment} />}
           {page === "historico" && isAdmin && <ImportHistorico equipment={equipment} />}
+          {page === "solped" && isAdmin && <SolpedPage />}
+          {page === "avisos" && isAdmin && <AvisosPage />}
 
           {page === "verificacion" && isAdmin && (() => {
             // Group readings by OT
