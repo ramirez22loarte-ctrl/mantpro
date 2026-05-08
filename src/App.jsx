@@ -982,7 +982,14 @@ function NewOT({ equipment, locations, jis, users, onClose, onSave }) {
             <Lbl l="Disciplina"><select className="inp" value={f.discipline} onChange={e => s("discipline", e.target.value)}>{DISCIPLINES.map(d => <option key={d}>{d}</option>)}</select></Lbl>
             <Lbl l="Prioridad"><select className="inp" value={f.priority} onChange={e => s("priority", e.target.value)}>{PRIORITIES.map(p => <option key={p}>{p}</option>)}</select></Lbl>
           </div>
-          <Lbl l="Fecha límite"><input className="inp" type="date" value={f.due_date} onChange={e => s("due_date", e.target.value)} /></Lbl>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <Lbl l="Equipo"><select className="inp" value={f.equipment_id} onChange={e => s("equipment_id", e.target.value)}><option value="">Seleccionar</option>{equipment.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}</select></Lbl>
+            <Lbl l="Ubicación"><select className="inp" value={f.location_id} onChange={e => s("location_id", e.target.value)}><option value="">Seleccionar</option>{locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select></Lbl>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
+            <Lbl l="Fecha límite"><input className="inp" type="date" value={f.due_date} onChange={e => s("due_date", e.target.value)} /></Lbl>
+          </div>
+          <Lbl l="Job Instruction"><select className="inp" value={f.job_instruction_id} onChange={e => s("job_instruction_id", e.target.value)}><option value="">Sin instrucción</option>{jis.map(j => <option key={j.id} value={j.id}>{j.code} — {j.title}</option>)}</select></Lbl>
           <Lbl l="Descripción"><textarea className="inp" rows={2} value={f.description} onChange={e => s("description", e.target.value)} style={{ resize: "vertical" }} /></Lbl>
           <div style={{ background: "#060b14", borderRadius: 9, padding: 12 }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: D_COLOR[f.discipline], marginBottom: 8 }}>{D_ICON[f.discipline]} Parámetros precargados — {f.discipline} ({previewParams.length})</div>
