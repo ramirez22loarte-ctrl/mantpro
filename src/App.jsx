@@ -1686,21 +1686,20 @@ function SolpedPage() {
   const s = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
   useEffect(() => {
-    supabase.from("solped").select("*").order("created_at", { ascending: false }).then(({ data }) => {
+    supabase.from("solped").select("id,tipo,area,solped,actividad,avances,prioridad,avance_pct,estado,fecha_inicio,fecha_fin,archivo_url,created_at").order("created_at", { ascending: false }).then(({ data, error }) => {
+      if (error) console.error("solped load error:", error);
       setItems(data || []); setLoading(false);
     });
   }, []);
 
   const save = async () => {
-    try {
-      if (editId) {
-        const { data } = await supabase.from("solped").update(form).eq("id", editId).select().single();
-        if (data) setItems(p => p.map(x => x.id === editId ? data : x));
-      } else {
-        const { data } = await supabase.from("solped").insert(form).select().single();
-        if (data) setItems(p => [data, ...p]);
-      }
-    } catch(e) { console.error("Save error:", e); }
+    if (editId) {
+      const { data } = await supabase.from("solped").update(form).eq("id", editId).select().single();
+      if (data) setItems(p => p.map(x => x.id === editId ? data : x));
+    } else {
+      const { data } = await supabase.from("solped").insert(form).select().single();
+      if (data) setItems(p => [data, ...p]);
+    }
     setForm(empty); setEditId(null); setShowForm(false);
   };
 
@@ -1767,13 +1766,11 @@ function SolpedPage() {
                     const file = e.target.files[0];
                     if (!file) return;
                     const fileName = Date.now() + "_" + file.name;
-                    try {
-                      const { data, error } = await supabase.storage.from("adjuntos").upload(fileName, file);
-                      if (!error) {
-                        const { data: urlData } = supabase.storage.from("adjuntos").getPublicUrl(fileName);
-                        s("archivo_url", urlData.publicUrl);
-                      }
-                    } catch(e) { console.error("Upload error:", e); }
+                    const { data, error } = await supabase.storage.from("adjuntos").upload(fileName, file);
+                    if (!error) {
+                      const { data: urlData } = supabase.storage.from("adjuntos").getPublicUrl(fileName);
+                      s("archivo_url", urlData.publicUrl);
+                    }
                   }} />
                   <button className="btn" type="button" onClick={() => fileRef.current?.click()} style={{ background: "#111c30", color: "#60a5fa", padding: "8px 14px", fontSize: 12 }}>📎 Seleccionar archivo</button>
                   {form.archivo_url && <a href={form.archivo_url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: "#34d399" }}>✅ Archivo adjunto</a>}
@@ -1840,21 +1837,20 @@ function AvisosPage() {
   const s = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
   useEffect(() => {
-    supabase.from("avisos").select("*").order("created_at", { ascending: false }).then(({ data }) => {
+    supabase.from("avisos").select("id,area,ot_aviso,n_aviso,actividad,acciones,prioridad,avance_pct,estado,fecha_reporte,fecha_fin,archivo_url,created_at").order("created_at", { ascending: false }).then(({ data, error }) => {
+      if (error) console.error("avisos load error:", error);
       setItems(data || []); setLoading(false);
     });
   }, []);
 
   const save = async () => {
-    try {
-      if (editId) {
-        const { data } = await supabase.from("avisos").update(form).eq("id", editId).select().single();
-        if (data) setItems(p => p.map(x => x.id === editId ? data : x));
-      } else {
-        const { data } = await supabase.from("avisos").insert(form).select().single();
-        if (data) setItems(p => [data, ...p]);
-      }
-    } catch(e) { console.error("Save error:", e); }
+    if (editId) {
+      const { data } = await supabase.from("avisos").update(form).eq("id", editId).select().single();
+      if (data) setItems(p => p.map(x => x.id === editId ? data : x));
+    } else {
+      const { data } = await supabase.from("avisos").insert(form).select().single();
+      if (data) setItems(p => [data, ...p]);
+    }
     setForm(empty); setEditId(null); setShowForm(false);
   };
 
@@ -1917,13 +1913,11 @@ function AvisosPage() {
                     const file = e.target.files[0];
                     if (!file) return;
                     const fileName = Date.now() + "_" + file.name;
-                    try {
-                      const { data, error } = await supabase.storage.from("adjuntos").upload(fileName, file);
-                      if (!error) {
-                        const { data: urlData } = supabase.storage.from("adjuntos").getPublicUrl(fileName);
-                        s("archivo_url", urlData.publicUrl);
-                      }
-                    } catch(e) { console.error("Upload error:", e); }
+                    const { data, error } = await supabase.storage.from("adjuntos").upload(fileName, file);
+                    if (!error) {
+                      const { data: urlData } = supabase.storage.from("adjuntos").getPublicUrl(fileName);
+                      s("archivo_url", urlData.publicUrl);
+                    }
                   }} />
                   <button className="btn" type="button" onClick={() => fileRefA.current?.click()} style={{ background: "#111c30", color: "#60a5fa", padding: "8px 14px", fontSize: 12 }}>📎 Seleccionar archivo</button>
                   {form.archivo_url && <a href={form.archivo_url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: "#34d399" }}>✅ Archivo adjunto</a>}
