@@ -2068,6 +2068,7 @@ export default function App() {
             <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.1 }}>
               <div style={{ fontFamily: "Arial Rounded MT Bold, Arial, sans-serif", fontSize: 22, fontWeight: 900, color: "#0099D6", letterSpacing: "-0.5px" }}>xylem</div>
               <div style={{ fontSize: 9, color: "#0099D6", letterSpacing: "0.04em", fontStyle: "italic" }}>Let's Solve Water</div>
+              <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 6, fontWeight: 500 }}>Luis Ramírez</div>
             </div>
           ) : (
             <div style={{ fontFamily: "Arial, sans-serif", fontSize: 14, fontWeight: 900, color: "#0099D6" }}>xy</div>
