@@ -948,7 +948,7 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
 
 // ── NEW OT MODAL ─────────────────────────────────────────────
 function NewOT({ equipment, locations, jis, users, onClose, onSave }) {
-  const [f, setF] = useState({ id: "", title: "", equipment_id: "", area: "", discipline: "Mecánico", priority: "Media", job_instruction_id: "", due_date: "", description: "" });
+  const [f, setF] = useState({ title: "", equipment_id: "", location_id: "", discipline: "Mecánico", priority: "Media", assigned_to: "", job_instruction_id: "", due_date: "", description: "" });
   const [saving, setSaving] = useState(false);
   const s = (k, v) => setF(p => ({ ...p, [k]: v }));
   const previewParams = DEFAULT_PARAMS[f.discipline] || [];
@@ -956,18 +956,13 @@ function NewOT({ equipment, locations, jis, users, onClose, onSave }) {
   const submit = async () => {
     if (!f.title) return;
     setSaving(true);
-    const suffix = f.discipline === "Mecánico" ? "" : f.discipline === "Eléctrico" ? "-E" : "-I";
-    const id = f.id.trim() ? f.id.trim() + suffix : "OT-" + Date.now().toString().slice(-6);
+    const id = "OT-" + Date.now().toString().slice(-6);
     const params = previewParams.map((p, i) => ({ name: p.name, unit: p.unit, expected: "", sort_order: i }));
-    // Find equipment by area to get equipment_id
-    const eqByArea = equipment.find(e => e.area === f.area);
     const ot = await db.createOT({
       id, title: f.title, discipline: f.discipline, priority: f.priority,
-      equipment_id: parseInt(f.equipment_id) || null, location_id: null,
-      assigned_to: null, job_instruction_id: parseInt(f.job_instruction_id) || null,
-      due_date: f.due_date || null,
-      description: (eqByArea?.code || "") + "|" + (f.area || "") + "||" + f.description,
-      status: "Abierta",
+      equipment_id: parseInt(f.equipment_id) || null, location_id: parseInt(f.location_id) || null,
+      assigned_to: parseInt(f.assigned_to) || null, job_instruction_id: parseInt(f.job_instruction_id) || null,
+      due_date: f.due_date || null, description: f.description, status: "Abierta",
       created_at: new Date().toISOString().split("T")[0]
     }, params);
     if (ot) onSave(ot);
@@ -988,17 +983,11 @@ function NewOT({ equipment, locations, jis, users, onClose, onSave }) {
             <Lbl l="Prioridad"><select className="inp" value={f.priority} onChange={e => s("priority", e.target.value)}>{PRIORITIES.map(p => <option key={p}>{p}</option>)}</select></Lbl>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <Lbl l="N° Orden de Trabajo"><input className="inp" placeholder="Ej: 2000195908" value={f.id} onChange={e => s("id", e.target.value)} style={{ fontFamily: "Syne,sans-serif", letterSpacing: "0.05em" }} /></Lbl>
-            <Lbl l="Área"><select className="inp" value={f.area} onChange={e => s("area", e.target.value)}>
-              <option value="">Seleccionar área</option>
-              {[...new Set(equipment.map(e => e.area).filter(Boolean))].sort().map(a => <option key={a} value={a}>{a}</option>)}
-            </select></Lbl>
+            <Lbl l="Equipo"><select className="inp" value={f.equipment_id} onChange={e => s("equipment_id", e.target.value)}><option value="">Seleccionar</option>{equipment.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}</select></Lbl>
+            <Lbl l="Ubicación"><select className="inp" value={f.location_id} onChange={e => s("location_id", e.target.value)}><option value="">Seleccionar</option>{locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select></Lbl>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <Lbl l="Equipo (TAG)"><select className="inp" value={f.equipment_id} onChange={e => s("equipment_id", e.target.value)}>
-              <option value="">Seleccionar</option>
-              {equipment.filter(e => !f.area || e.area === f.area).map(e => <option key={e.id} value={e.id}>{e.code || e.name}</option>)}
-            </select></Lbl>
+            <Lbl l="Técnico"><select className="inp" value={f.assigned_to} onChange={e => s("assigned_to", e.target.value)}><option value="">Seleccionar</option>{users.filter(u => u.role === "tecnico").map(u => <option key={u.id} value={u.id}>{u.name} ({u.discipline})</option>)}</select></Lbl>
             <Lbl l="Fecha límite"><input className="inp" type="date" value={f.due_date} onChange={e => s("due_date", e.target.value)} /></Lbl>
           </div>
           <Lbl l="Job Instruction"><select className="inp" value={f.job_instruction_id} onChange={e => s("job_instruction_id", e.target.value)}><option value="">Sin instrucción</option>{jis.map(j => <option key={j.id} value={j.id}>{j.code} — {j.title}</option>)}</select></Lbl>
@@ -1013,7 +1002,7 @@ function NewOT({ equipment, locations, jis, users, onClose, onSave }) {
             <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "8px 16px", fontSize: 13 }}>Cancelar</button>
             <button className="btn" onClick={submit} disabled={!f.title || saving}
               style={{ background: f.title && !saving ? "linear-gradient(135deg,#1d4ed8,#7c3aed)" : "#111c30", color: f.title && !saving ? "#fff" : "#475569", padding: "8px 20px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
-              {saving ? <><Spinner /> Creando...</> : "✅ Crear OT"}
+              {saving ? <><Spinner /> Creando...</> : "Crear OT"}
             </button>
           </div>
         </div>
@@ -1681,7 +1670,8 @@ function SolpedPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const empty = { tipo: "Repuesto", area: "", solped: "", actividad: "", avances: "", prioridad: "Media", avance_pct: 0, estado: "Pendiente", fecha_inicio: "", fecha_fin: "" };
+  const empty = { tipo: "Repuesto", area: "", solped: "", actividad: "", avances: "", prioridad: "Media", avance_pct: 0, estado: "Pendiente", fecha_inicio: "", fecha_fin: "", archivo_url: "" };
+  const fileRef = useRef();
   const [form, setForm] = useState(empty);
   const [editId, setEditId] = useState(null);
   const s = (k, v) => setForm(p => ({ ...p, [k]: v }));
@@ -1711,9 +1701,22 @@ function SolpedPage() {
 
   return (
     <div className="fd">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
         <div style={{ fontFamily: "Syne,sans-serif", fontSize: 15, fontWeight: 700, color: "#f1f5f9" }}>🔧 Seguimiento de SOLPED y Repuestos</div>
-        <button className="btn" onClick={() => { setForm(empty); setEditId(null); setShowForm(true); }} style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "7px 16px", fontSize: 13 }}>+ Agregar</button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="btn" onClick={() => {
+            const XLSX = window.XLSX;
+            if (!XLSX) { alert("Recarga la página"); return; }
+            const wb = XLSX.utils.book_new();
+            const wsData = [["Tipo","Área","N° Solped","Actividad","Avances/Histórico","Prioridad","Avance %","Estado","Fecha Inicio","Fecha Fin","Archivo"]];
+            items.forEach(i => wsData.push([i.tipo, i.area, i.solped, i.actividad, i.avances, i.prioridad, i.avance_pct, i.estado, i.fecha_inicio, i.fecha_fin, i.archivo_url || ""]));
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
+            ws["!cols"] = [10,15,15,30,30,10,10,12,12,12,30].map(w => ({ wch: w }));
+            XLSX.utils.book_append_sheet(wb, ws, "SOLPED");
+            XLSX.writeFile(wb, "solped_repuestos_" + new Date().toLocaleDateString("es-CO").replace(/\//g,"-") + ".xlsx");
+          }} style={{ background: "#0f2040", color: "#34d399", padding: "7px 14px", fontSize: 13 }}>📊 Exportar Excel</button>
+          <button className="btn" onClick={() => { setForm(empty); setEditId(null); setShowForm(true); }} style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "7px 16px", fontSize: 13 }}>+ Agregar</button>
+        </div>
       </div>
 
       {showForm && (
@@ -1747,6 +1750,22 @@ function SolpedPage() {
                 <Lbl l="Fecha de Inicio"><input className="inp" type="date" value={form.fecha_inicio} onChange={e => s("fecha_inicio", e.target.value)} /></Lbl>
                 <Lbl l="Fecha de Fin"><input className="inp" type="date" value={form.fecha_fin} onChange={e => s("fecha_fin", e.target.value)} /></Lbl>
               </div>
+              <Lbl l="Adjuntar Archivo">
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input ref={fileRef} type="file" style={{ display: "none" }} onChange={async e => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    const fileName = Date.now() + "_" + file.name;
+                    const { data, error } = await supabase.storage.from("adjuntos").upload(fileName, file);
+                    if (!error) {
+                      const { data: urlData } = supabase.storage.from("adjuntos").getPublicUrl(fileName);
+                      s("archivo_url", urlData.publicUrl);
+                    }
+                  }} />
+                  <button className="btn" type="button" onClick={() => fileRef.current?.click()} style={{ background: "#111c30", color: "#60a5fa", padding: "8px 14px", fontSize: 12 }}>📎 Seleccionar archivo</button>
+                  {form.archivo_url && <a href={form.archivo_url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: "#34d399" }}>✅ Archivo adjunto</a>}
+                </div>
+              </Lbl>
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                 <button className="btn" onClick={() => setShowForm(false)} style={{ background: "#111c30", color: "#64748b", padding: "8px 16px", fontSize: 13 }}>Cancelar</button>
                 <button className="btn" onClick={save} style={{ background: "linear-gradient(135deg,#065f46,#0f766e)", color: "#34d399", padding: "8px 18px", fontSize: 13 }}>💾 Guardar</button>
@@ -1759,7 +1778,7 @@ function SolpedPage() {
       {loading ? <div style={{ color: "#475569", textAlign: "center", padding: 40 }}>Cargando...</div> : (
         <div style={{ overflowX: "auto" }}>
           <table className="ptable">
-            <thead><tr>{["Tipo","Área","N° Solped","Actividad","Avances","Prioridad","Avance %","Estado","F. Inicio","F. Fin","Acciones"].map(h => <th key={h}>{h}</th>)}</tr></thead>
+            <thead><tr>{["Tipo","Área","N° Solped","Actividad","Avances","Prioridad","Avance %","Estado","F. Inicio","F. Fin","Archivo","Acciones"].map(h => <th key={h}>{h}</th>)}</tr></thead>
             <tbody>
               {items.length === 0 ? <tr><td colSpan={11} style={{ textAlign: "center", color: "#334155", padding: 24 }}>Sin registros aún.</td></tr> :
               items.map(item => (
@@ -1781,8 +1800,9 @@ function SolpedPage() {
                   <td><span className="tag" style={{ background: item.estado === "Completado" ? "#1e3a2a" : item.estado === "Cancelado" ? "#3b0f0f" : item.estado === "En Proceso" ? "#1e2a3a" : "#2a2a1e", color: item.estado === "Completado" ? "#34d399" : item.estado === "Cancelado" ? "#f87171" : item.estado === "En Proceso" ? "#60a5fa" : "#fbbf24" }}>{item.estado}</span></td>
                   <td style={{ color: "#475569", fontSize: 11 }}>{item.fecha_inicio}</td>
                   <td style={{ color: "#475569", fontSize: 11 }}>{item.fecha_fin}</td>
+                  <td>{item.archivo_url ? <a href={item.archivo_url} target="_blank" rel="noreferrer" style={{ color: "#34d399", fontSize: 11 }}>📎 Ver</a> : <span style={{ color: "#334155", fontSize: 11 }}>—</span>}</td>
                   <td style={{ display: "flex", gap: 5 }}>
-                    <button className="btn" onClick={() => { setForm({ tipo: item.tipo, area: item.area, solped: item.solped, actividad: item.actividad, avances: item.avances, prioridad: item.prioridad, avance_pct: item.avance_pct, estado: item.estado, fecha_inicio: item.fecha_inicio || "", fecha_fin: item.fecha_fin || "" }); setEditId(item.id); setShowForm(true); }} style={{ background: "#0f2040", color: "#60a5fa", padding: "3px 9px", fontSize: 11 }}>✏️</button>
+                    <button className="btn" onClick={() => { setForm({ tipo: item.tipo, area: item.area, solped: item.solped, actividad: item.actividad, avances: item.avances, prioridad: item.prioridad, avance_pct: item.avance_pct, estado: item.estado, fecha_inicio: item.fecha_inicio || "", fecha_fin: item.fecha_fin || "", archivo_url: item.archivo_url || "" }); setEditId(item.id); setShowForm(true); }} style={{ background: "#0f2040", color: "#60a5fa", padding: "3px 9px", fontSize: 11 }}>✏️</button>
                     <button className="btn" onClick={() => del(item.id)} style={{ background: "#3b0f0f", color: "#f87171", padding: "3px 9px", fontSize: 11 }}>🗑️</button>
                   </td>
                 </tr>
@@ -1800,7 +1820,8 @@ function AvisosPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const empty = { area: "", ot_aviso: "", n_aviso: "", actividad: "", acciones: "", prioridad: "Media", avance_pct: 0, estado: "Pendiente", fecha_reporte: "", fecha_fin: "" };
+  const empty = { area: "", ot_aviso: "", n_aviso: "", actividad: "", acciones: "", prioridad: "Media", avance_pct: 0, estado: "Pendiente", fecha_reporte: "", fecha_fin: "", archivo_url: "" };
+  const fileRefA = useRef();
   const [form, setForm] = useState(empty);
   const [editId, setEditId] = useState(null);
   const s = (k, v) => setForm(p => ({ ...p, [k]: v }));
@@ -1830,9 +1851,22 @@ function AvisosPage() {
 
   return (
     <div className="fd">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
         <div style={{ fontFamily: "Syne,sans-serif", fontSize: 15, fontWeight: 700, color: "#f1f5f9" }}>🔔 Seguimiento de Avisos</div>
-        <button className="btn" onClick={() => { setForm(empty); setEditId(null); setShowForm(true); }} style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "7px 16px", fontSize: 13 }}>+ Agregar</button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="btn" onClick={() => {
+            const XLSX = window.XLSX;
+            if (!XLSX) { alert("Recarga la página"); return; }
+            const wb = XLSX.utils.book_new();
+            const wsData = [["Área","OT Aviso","N° Aviso","Actividad","Acciones Tomadas","Prioridad","Avance %","Estado","Fecha Reporte","Fecha Fin","Archivo"]];
+            items.forEach(i => wsData.push([i.area, i.ot_aviso, i.n_aviso, i.actividad, i.acciones, i.prioridad, i.avance_pct, i.estado, i.fecha_reporte, i.fecha_fin, i.archivo_url || ""]));
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
+            ws["!cols"] = [15,15,15,30,30,10,10,12,12,12,30].map(w => ({ wch: w }));
+            XLSX.utils.book_append_sheet(wb, ws, "Avisos");
+            XLSX.writeFile(wb, "seguimiento_avisos_" + new Date().toLocaleDateString("es-CO").replace(/\//g,"-") + ".xlsx");
+          }} style={{ background: "#0f2040", color: "#34d399", padding: "7px 14px", fontSize: 13 }}>📊 Exportar Excel</button>
+          <button className="btn" onClick={() => { setForm(empty); setEditId(null); setShowForm(true); }} style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "7px 16px", fontSize: 13 }}>+ Agregar</button>
+        </div>
       </div>
 
       {showForm && (
@@ -1862,6 +1896,22 @@ function AvisosPage() {
                 <Lbl l="Fecha de Reporte"><input className="inp" type="date" value={form.fecha_reporte} onChange={e => s("fecha_reporte", e.target.value)} /></Lbl>
                 <Lbl l="Fecha de Fin de Aviso"><input className="inp" type="date" value={form.fecha_fin} onChange={e => s("fecha_fin", e.target.value)} /></Lbl>
               </div>
+              <Lbl l="Adjuntar Archivo">
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input ref={fileRefA} type="file" style={{ display: "none" }} onChange={async e => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    const fileName = Date.now() + "_" + file.name;
+                    const { data, error } = await supabase.storage.from("adjuntos").upload(fileName, file);
+                    if (!error) {
+                      const { data: urlData } = supabase.storage.from("adjuntos").getPublicUrl(fileName);
+                      s("archivo_url", urlData.publicUrl);
+                    }
+                  }} />
+                  <button className="btn" type="button" onClick={() => fileRefA.current?.click()} style={{ background: "#111c30", color: "#60a5fa", padding: "8px 14px", fontSize: 12 }}>📎 Seleccionar archivo</button>
+                  {form.archivo_url && <a href={form.archivo_url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: "#34d399" }}>✅ Archivo adjunto</a>}
+                </div>
+              </Lbl>
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                 <button className="btn" onClick={() => setShowForm(false)} style={{ background: "#111c30", color: "#64748b", padding: "8px 16px", fontSize: 13 }}>Cancelar</button>
                 <button className="btn" onClick={save} style={{ background: "linear-gradient(135deg,#065f46,#0f766e)", color: "#34d399", padding: "8px 18px", fontSize: 13 }}>💾 Guardar</button>
@@ -1874,7 +1924,7 @@ function AvisosPage() {
       {loading ? <div style={{ color: "#475569", textAlign: "center", padding: 40 }}>Cargando...</div> : (
         <div style={{ overflowX: "auto" }}>
           <table className="ptable">
-            <thead><tr>{["Área","OT Aviso","N° Aviso","Actividad","Acciones Tomadas","Prioridad","Avance %","Estado","F. Reporte","F. Fin","Acciones"].map(h => <th key={h}>{h}</th>)}</tr></thead>
+            <thead><tr>{["Área","OT Aviso","N° Aviso","Actividad","Acciones Tomadas","Prioridad","Avance %","Estado","F. Reporte","F. Fin","Archivo","Acciones"].map(h => <th key={h}>{h}</th>)}</tr></thead>
             <tbody>
               {items.length === 0 ? <tr><td colSpan={11} style={{ textAlign: "center", color: "#334155", padding: 24 }}>Sin avisos aún.</td></tr> :
               items.map(item => (
@@ -1896,8 +1946,9 @@ function AvisosPage() {
                   <td><span className="tag" style={{ background: item.estado === "Completado" ? "#1e3a2a" : item.estado === "Cancelado" ? "#3b0f0f" : item.estado === "En Proceso" ? "#1e2a3a" : "#2a2a1e", color: item.estado === "Completado" ? "#34d399" : item.estado === "Cancelado" ? "#f87171" : item.estado === "En Proceso" ? "#60a5fa" : "#fbbf24" }}>{item.estado}</span></td>
                   <td style={{ color: "#475569", fontSize: 11 }}>{item.fecha_reporte}</td>
                   <td style={{ color: "#475569", fontSize: 11 }}>{item.fecha_fin}</td>
+                  <td>{item.archivo_url ? <a href={item.archivo_url} target="_blank" rel="noreferrer" style={{ color: "#34d399", fontSize: 11 }}>📎 Ver</a> : <span style={{ color: "#334155", fontSize: 11 }}>—</span>}</td>
                   <td style={{ display: "flex", gap: 5 }}>
-                    <button className="btn" onClick={() => { setForm({ area: item.area, ot_aviso: item.ot_aviso, n_aviso: item.n_aviso, actividad: item.actividad, acciones: item.acciones, prioridad: item.prioridad, avance_pct: item.avance_pct, estado: item.estado, fecha_reporte: item.fecha_reporte || "", fecha_fin: item.fecha_fin || "" }); setEditId(item.id); setShowForm(true); }} style={{ background: "#0f2040", color: "#60a5fa", padding: "3px 9px", fontSize: 11 }}>✏️</button>
+                    <button className="btn" onClick={() => { setForm({ area: item.area, ot_aviso: item.ot_aviso, n_aviso: item.n_aviso, actividad: item.actividad, acciones: item.acciones, prioridad: item.prioridad, avance_pct: item.avance_pct, estado: item.estado, fecha_reporte: item.fecha_reporte || "", fecha_fin: item.fecha_fin || "", archivo_url: item.archivo_url || "" }); setEditId(item.id); setShowForm(true); }} style={{ background: "#0f2040", color: "#60a5fa", padding: "3px 9px", fontSize: 11 }}>✏️</button>
                     <button className="btn" onClick={() => del(item.id)} style={{ background: "#3b0f0f", color: "#f87171", padding: "3px 9px", fontSize: 11 }}>🗑️</button>
                   </td>
                 </tr>
