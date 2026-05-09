@@ -948,7 +948,7 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
 
 // ── NEW OT MODAL ─────────────────────────────────────────────
 function NewOT({ equipment, locations, jis, users, onClose, onSave }) {
-  const [f, setF] = useState({ title: "", equipment_id: "", location_id: "", discipline: "Mecánico", priority: "Media", assigned_to: "", job_instruction_id: "", due_date: "", description: "" });
+  const [f, setF] = useState({ id: "", title: "", equipment_id: "", area: "", discipline: "Mecánico", priority: "Media", job_instruction_id: "", due_date: "", description: "" });
   const [saving, setSaving] = useState(false);
   const s = (k, v) => setF(p => ({ ...p, [k]: v }));
   const previewParams = DEFAULT_PARAMS[f.discipline] || [];
@@ -956,13 +956,16 @@ function NewOT({ equipment, locations, jis, users, onClose, onSave }) {
   const submit = async () => {
     if (!f.title) return;
     setSaving(true);
-    const id = "OT-" + Date.now().toString().slice(-6);
+    const suffix = f.discipline === "Mecánico" ? "" : f.discipline === "Eléctrico" ? "-E" : "-I";
+    const id = f.id.trim() ? f.id.trim() + suffix : "OT-" + Date.now().toString().slice(-6);
     const params = previewParams.map((p, i) => ({ name: p.name, unit: p.unit, expected: "", sort_order: i }));
     const ot = await db.createOT({
       id, title: f.title, discipline: f.discipline, priority: f.priority,
-      equipment_id: parseInt(f.equipment_id) || null, location_id: parseInt(f.location_id) || null,
-      assigned_to: parseInt(f.assigned_to) || null, job_instruction_id: parseInt(f.job_instruction_id) || null,
-      due_date: f.due_date || null, description: f.description, status: "Abierta",
+      equipment_id: parseInt(f.equipment_id) || null, location_id: null,
+      assigned_to: null, job_instruction_id: parseInt(f.job_instruction_id) || null,
+      due_date: f.due_date || null,
+      description: "|" + (f.area || "") + "||" + f.description,
+      status: "Abierta",
       created_at: new Date().toISOString().split("T")[0]
     }, params);
     if (ot) onSave(ot);
@@ -983,11 +986,17 @@ function NewOT({ equipment, locations, jis, users, onClose, onSave }) {
             <Lbl l="Prioridad"><select className="inp" value={f.priority} onChange={e => s("priority", e.target.value)}>{PRIORITIES.map(p => <option key={p}>{p}</option>)}</select></Lbl>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <Lbl l="Equipo"><select className="inp" value={f.equipment_id} onChange={e => s("equipment_id", e.target.value)}><option value="">Seleccionar</option>{equipment.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}</select></Lbl>
-            <Lbl l="Ubicación"><select className="inp" value={f.location_id} onChange={e => s("location_id", e.target.value)}><option value="">Seleccionar</option>{locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select></Lbl>
+            <Lbl l="N° Orden de Trabajo"><input className="inp" placeholder="Ej: 2000195908" value={f.id} onChange={e => s("id", e.target.value)} style={{ fontFamily: "Syne,sans-serif", letterSpacing: "0.05em" }} /></Lbl>
+            <Lbl l="Área"><select className="inp" value={f.area} onChange={e => { s("area", e.target.value); s("equipment_id", ""); }}>
+              <option value="">Seleccionar área</option>
+              {[...new Set(equipment.map(e => e.area).filter(Boolean))].sort().map(a => <option key={a} value={a}>{a}</option>)}
+            </select></Lbl>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <Lbl l="Técnico"><select className="inp" value={f.assigned_to} onChange={e => s("assigned_to", e.target.value)}><option value="">Seleccionar</option>{users.filter(u => u.role === "tecnico").map(u => <option key={u.id} value={u.id}>{u.name} ({u.discipline})</option>)}</select></Lbl>
+            <Lbl l="Equipo (TAG)"><select className="inp" value={f.equipment_id} onChange={e => s("equipment_id", e.target.value)}>
+              <option value="">Seleccionar</option>
+              {equipment.filter(e => !f.area || e.area === f.area).map(e => <option key={e.id} value={e.id}>{e.code || e.name}</option>)}
+            </select></Lbl>
             <Lbl l="Fecha límite"><input className="inp" type="date" value={f.due_date} onChange={e => s("due_date", e.target.value)} /></Lbl>
           </div>
           <Lbl l="Job Instruction"><select className="inp" value={f.job_instruction_id} onChange={e => s("job_instruction_id", e.target.value)}><option value="">Sin instrucción</option>{jis.map(j => <option key={j.id} value={j.id}>{j.code} — {j.title}</option>)}</select></Lbl>
