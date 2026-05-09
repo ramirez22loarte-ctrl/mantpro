@@ -1692,13 +1692,15 @@ function SolpedPage() {
   }, []);
 
   const save = async () => {
-    if (editId) {
-      const { data } = await supabase.from("solped").update(form).eq("id", editId).select().single();
-      if (data) setItems(p => p.map(x => x.id === editId ? data : x));
-    } else {
-      const { data } = await supabase.from("solped").insert(form).select().single();
-      if (data) setItems(p => [data, ...p]);
-    }
+    try {
+      if (editId) {
+        const { data } = await supabase.from("solped").update(form).eq("id", editId).select().single();
+        if (data) setItems(p => p.map(x => x.id === editId ? data : x));
+      } else {
+        const { data } = await supabase.from("solped").insert(form).select().single();
+        if (data) setItems(p => [data, ...p]);
+      }
+    } catch(e) { console.error("Save error:", e); }
     setForm(empty); setEditId(null); setShowForm(false);
   };
 
@@ -1765,11 +1767,13 @@ function SolpedPage() {
                     const file = e.target.files[0];
                     if (!file) return;
                     const fileName = Date.now() + "_" + file.name;
-                    const { data, error } = await supabase.storage.from("adjuntos").upload(fileName, file);
-                    if (!error) {
-                      const { data: urlData } = supabase.storage.from("adjuntos").getPublicUrl(fileName);
-                      s("archivo_url", urlData.publicUrl);
-                    }
+                    try {
+                      const { data, error } = await supabase.storage.from("adjuntos").upload(fileName, file);
+                      if (!error) {
+                        const { data: urlData } = supabase.storage.from("adjuntos").getPublicUrl(fileName);
+                        s("archivo_url", urlData.publicUrl);
+                      }
+                    } catch(e) { console.error("Upload error:", e); }
                   }} />
                   <button className="btn" type="button" onClick={() => fileRef.current?.click()} style={{ background: "#111c30", color: "#60a5fa", padding: "8px 14px", fontSize: 12 }}>📎 Seleccionar archivo</button>
                   {form.archivo_url && <a href={form.archivo_url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: "#34d399" }}>✅ Archivo adjunto</a>}
@@ -1842,13 +1846,15 @@ function AvisosPage() {
   }, []);
 
   const save = async () => {
-    if (editId) {
-      const { data } = await supabase.from("avisos").update(form).eq("id", editId).select().single();
-      if (data) setItems(p => p.map(x => x.id === editId ? data : x));
-    } else {
-      const { data } = await supabase.from("avisos").insert(form).select().single();
-      if (data) setItems(p => [data, ...p]);
-    }
+    try {
+      if (editId) {
+        const { data } = await supabase.from("avisos").update(form).eq("id", editId).select().single();
+        if (data) setItems(p => p.map(x => x.id === editId ? data : x));
+      } else {
+        const { data } = await supabase.from("avisos").insert(form).select().single();
+        if (data) setItems(p => [data, ...p]);
+      }
+    } catch(e) { console.error("Save error:", e); }
     setForm(empty); setEditId(null); setShowForm(false);
   };
 
@@ -1911,11 +1917,13 @@ function AvisosPage() {
                     const file = e.target.files[0];
                     if (!file) return;
                     const fileName = Date.now() + "_" + file.name;
-                    const { data, error } = await supabase.storage.from("adjuntos").upload(fileName, file);
-                    if (!error) {
-                      const { data: urlData } = supabase.storage.from("adjuntos").getPublicUrl(fileName);
-                      s("archivo_url", urlData.publicUrl);
-                    }
+                    try {
+                      const { data, error } = await supabase.storage.from("adjuntos").upload(fileName, file);
+                      if (!error) {
+                        const { data: urlData } = supabase.storage.from("adjuntos").getPublicUrl(fileName);
+                        s("archivo_url", urlData.publicUrl);
+                      }
+                    } catch(e) { console.error("Upload error:", e); }
                   }} />
                   <button className="btn" type="button" onClick={() => fileRefA.current?.click()} style={{ background: "#111c30", color: "#60a5fa", padding: "8px 14px", fontSize: 12 }}>📎 Seleccionar archivo</button>
                   {form.archivo_url && <a href={form.archivo_url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: "#34d399" }}>✅ Archivo adjunto</a>}
