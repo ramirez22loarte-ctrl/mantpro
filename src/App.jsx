@@ -1746,11 +1746,12 @@ function SolpedPage() {
 
   const save = async () => {
     if (editId) {
-      const { data } = await supabase.from("solped").update(form).eq("id", editId).select().single();
-      if (data) setItems(p => p.map(x => x.id === editId ? data : x));
+      await supabase.from("solped").update(form).eq("id", editId);
+      setItems(p => p.map(x => x.id === editId ? { ...x, ...form } : x));
     } else {
-      const { data } = await supabase.from("solped").insert(form).select().single();
-      if (data) setItems(p => [data, ...p]);
+      const { data, error } = await supabase.from("solped").insert(form).select("id,tipo,area,solped,actividad,avances,prioridad,avance_pct,estado,fecha_inicio,fecha_fin,archivo_url,created_at");
+      if (error) { console.error("Solped insert error:", error); return; }
+      if (data && data[0]) setItems(p => [data[0], ...p]);
     }
     setForm(empty); setEditId(null); setShowForm(false);
   };
@@ -1898,11 +1899,12 @@ function AvisosPage() {
 
   const save = async () => {
     if (editId) {
-      const { data } = await supabase.from("avisos").update(form).eq("id", editId).select().single();
-      if (data) setItems(p => p.map(x => x.id === editId ? data : x));
+      await supabase.from("avisos").update(form).eq("id", editId);
+      setItems(p => p.map(x => x.id === editId ? { ...x, ...form } : x));
     } else {
-      const { data } = await supabase.from("avisos").insert(form).select().single();
-      if (data) setItems(p => [data, ...p]);
+      const { data, error } = await supabase.from("avisos").insert(form).select("id,area,ot_aviso,n_aviso,actividad,acciones,prioridad,avance_pct,estado,fecha_reporte,fecha_fin,archivo_url,created_at");
+      if (error) { console.error("Avisos insert error:", error); return; }
+      if (data && data[0]) setItems(p => [data[0], ...p]);
     }
     setForm(empty); setEditId(null); setShowForm(false);
   };
