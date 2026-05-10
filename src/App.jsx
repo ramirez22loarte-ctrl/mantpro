@@ -2038,15 +2038,20 @@ function TallerPage() {
   const s = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
   useEffect(() => {
-    supabase.from("taller").select("*").order("created_at", { ascending: false }).then(({ data }) => { setItems(data || []); setLoading(false); });
+    supabase.from("taller").select("*").order("created_at", { ascending: false }).then(({ data, error }) => { if (error) { console.error("Taller error:", JSON.stringify(error)); setLoading(false); return; } setItems(data || []); setLoading(false); });
   }, []);
 
   const save = async () => {
+    const payload = {
+      ...form,
+      avance_inspeccion: form.avance_inspeccion === "" ? null : parseInt(form.avance_inspeccion) || 0,
+      avance_reparacion: form.avance_reparacion === "" ? null : parseInt(form.avance_reparacion) || 0,
+    };
     if (editId) {
-      const { data } = await supabase.from("taller").update(form).eq("id", editId).select().single();
+      const { data } = await supabase.from("taller").update(payload).eq("id", editId).select().single();
       if (data) setItems(p => p.map(x => x.id === editId ? data : x));
     } else {
-      const { data } = await supabase.from("taller").insert(form).select().single();
+      const { data } = await supabase.from("taller").insert(payload).select().single();
       if (data) setItems(p => [data, ...p]);
     }
     setShowForm(false); setEditId(null); setForm(empty);
