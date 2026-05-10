@@ -2048,11 +2048,12 @@ function TallerPage() {
       avance_reparacion: form.avance_reparacion === "" ? null : parseInt(form.avance_reparacion) || 0,
     };
     if (editId) {
-      const { data } = await supabase.from("taller").update(payload).eq("id", editId).select().single();
-      if (data) setItems(p => p.map(x => x.id === editId ? data : x));
+      await supabase.from("taller").update(payload).eq("id", editId);
+      setItems(p => p.map(x => x.id === editId ? { ...x, ...payload } : x));
     } else {
-      const { data } = await supabase.from("taller").insert(payload).select().single();
-      if (data) setItems(p => [data, ...p]);
+      const { data, error } = await supabase.from("taller").insert(payload).select("id,tipo_bomba,propiedad,serie,tag,avance_inspeccion,avance_reparacion,comentario,fecha_inicio_inspeccion,fecha_final_inspeccion,fecha_inicio_mantto,fecha_final_mantto,fecha_salida,responsable_salida,condicion,archivo_url,created_at");
+      if (error) { console.error("Insert error:", error); return; }
+      if (data && data[0]) setItems(p => [data[0], ...p]);
     }
     setShowForm(false); setEditId(null); setForm(empty);
   };
