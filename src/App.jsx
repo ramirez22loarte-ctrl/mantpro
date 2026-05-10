@@ -2116,7 +2116,7 @@ function TallerPage() {
                 <Lbl l="Fecha de Salida"><input className="inp" type="date" value={form.fecha_salida} onChange={e => s("fecha_salida", e.target.value)} /></Lbl>
                 <Lbl l="Responsable de Salida"><input className="inp" value={form.responsable_salida} onChange={e => s("responsable_salida", e.target.value)} placeholder="Nombre" /></Lbl>
               </div>
-              <Lbl l="Condición"><input className="inp" value={form.condicion} onChange={e => s("condicion", e.target.value)} placeholder="Ej: Buena, Regular, Mala" /></Lbl>
+              <Lbl l="Condición"><select className="inp" value={form.condicion} onChange={e => s("condicion", e.target.value)}><option value="">Seleccionar...</option><option>Operativo</option><option>Inoperativo</option></select></Lbl>
               <Lbl l="Adjuntar Archivo">
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   <input ref={fileRefT} type="file" style={{ display: "none" }} onChange={async e => {
