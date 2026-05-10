@@ -147,17 +147,44 @@ const db = {
   },
 };
 
+// ── MÓDULOS DISPONIBLES ──────────────────────────────────────
+const ALL_MODULOS = [
+  { k: "dashboard", l: "Dashboard" },
+  { k: "ots", l: "Órdenes de Trabajo" },
+  { k: "equipment", l: "Equipos" },
+  { k: "ji", l: "Job Instructions" },
+  { k: "kpi", l: "Indicadores KPI" },
+  { k: "dashboard_op", l: "Dashboard Operativo" },
+  { k: "verificacion", l: "Verificación" },
+  { k: "historico", l: "Importar Histórico" },
+  { k: "solped", l: "SOLPED y Repuestos" },
+  { k: "avisos", l: "Seguimiento Avisos" },
+  { k: "users", l: "Usuarios" },
+];
+
 // ── NEW USER MODAL ────────────────────────────────────────────
-function NewUser({ onClose, onSave }) {
-  const [f, setF] = useState({ name: "", email: "", password: "", role: "tecnico", discipline: "Mecánico" });
+function NewUser({ onClose, onSave, currentUser }) {
+  const [f, setF] = useState({ name: "", email: "", password: "", role: "tecnico", discipline: "Mecánico", full_access: false, modulos: [] });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
   const s = (k, v) => setF(p => ({ ...p, [k]: v }));
 
+  const availableModulos = currentUser?.full_access ? ALL_MODULOS : ALL_MODULOS.filter(m => (currentUser?.modulos || []).includes(m.k));
+
+  const toggleModulo = (k) => {
+    setF(p => ({ ...p, modulos: p.modulos.includes(k) ? p.modulos.filter(m => m !== k) : [...p.modulos, k] }));
+  };
+
   const submit = async () => {
     if (!f.name || !f.email || !f.password) { setErr("Nombre, email y contraseña son obligatorios."); return; }
     setSaving(true); setErr("");
-    const { data, error } = await db.createUser({ ...f, discipline: f.role === "admin" ? null : f.discipline });
+    const payload = {
+      ...f,
+      discipline: f.role === "admin" ? null : f.discipline,
+      full_access: f.role === "admin" ? f.full_access : false,
+      modulos: f.role === "admin" && !f.full_access ? f.modulos : [],
+    };
+    const { data, error } = await db.createUser(payload);
     if (error) { setErr("Error: email ya existe o datos inválidos."); setSaving(false); return; }
     onSave(data);
     setSaving(false);
@@ -165,7 +192,7 @@ function NewUser({ onClose, onSave }) {
 
   return (
     <div className="ov" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="mod fd" style={{ width: 420 }}>
+      <div className="mod fd" style={{ width: 460 }}>
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 18 }}>
           <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 16, color: "#f1f5f9" }}>👤 Nuevo Usuario</div>
           <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "5px 11px" }}>✕</button>
@@ -178,6 +205,30 @@ function NewUser({ onClose, onSave }) {
             <Lbl l="Rol"><select className="inp" value={f.role} onChange={e => s("role", e.target.value)}><option value="tecnico">Técnico</option><option value="admin">Administrador</option></select></Lbl>
             {f.role === "tecnico" && <Lbl l="Disciplina"><select className="inp" value={f.discipline} onChange={e => s("discipline", e.target.value)}>{["Mecánico","Eléctrico","Instrumentación"].map(d => <option key={d}>{d}</option>)}</select></Lbl>}
           </div>
+          {f.role === "admin" && (
+            <div style={{ background: "#0d1b2e", border: "1px solid #1e3a5f", borderRadius: 10, padding: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "#94a3b8" }}>PERMISOS DE MÓDULOS</div>
+                {currentUser?.full_access && (
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                    <input type="checkbox" checked={f.full_access} onChange={e => s("full_access", e.target.checked)} />
+                    <span style={{ fontSize: 12, color: "#a78bfa" }}>Acceso total</span>
+                  </label>
+                )}
+              </div>
+              {!f.full_access && (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                  {availableModulos.map(m => (
+                    <label key={m.k} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, color: f.modulos.includes(m.k) ? "#60a5fa" : "#64748b" }}>
+                      <input type="checkbox" checked={f.modulos.includes(m.k)} onChange={() => toggleModulo(m.k)} />
+                      {m.l}
+                    </label>
+                  ))}
+                </div>
+              )}
+              {f.full_access && <div style={{ fontSize: 11, color: "#34d399" }}>✅ Este admin tendrá acceso a todos los módulos</div>}
+            </div>
+          )}
           {err && <div style={{ fontSize: 12, color: "#f87171", background: "#3b0f0f", padding: "8px 12px", borderRadius: 7 }}>{err}</div>}
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 }}>
             <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "8px 16px", fontSize: 13 }}>Cancelar</button>
@@ -1992,6 +2043,10 @@ export default function App() {
   const [selectedOTs, setSelectedOTs] = useState(new Set());
 
   const isAdmin = user?.role === "admin";
+  // Admins existentes sin full_access definido se tratan como acceso total
+  if (isAdmin && user.full_access === null || user.full_access === undefined) {
+    user.full_access = true;
+  }
   const myOTsAll = isAdmin ? ots : ots; // techs see all OTs of their discipline (filtered at DB level)
   const myOTs = myOTsAll
     .filter(o => !filterOTDisc || o.discipline === filterOTDisc)
@@ -2056,7 +2111,11 @@ export default function App() {
     { k: "ots", i: "📋", l: "Mis Órdenes" },
     { k: "kpi", i: "📈", l: "Historial" },
   ];
-  const NAV = isAdmin ? ADMIN_NAV : TECH_NAV;
+  // Filtrar módulos según permisos del admin
+  const FILTERED_ADMIN_NAV = isAdmin
+    ? (user.full_access ? ADMIN_NAV : ADMIN_NAV.filter(n => (user.modulos || []).includes(n.k) || n.k === "users"))
+    : ADMIN_NAV;
+  const NAV = isAdmin ? FILTERED_ADMIN_NAV : TECH_NAV;
   const curNav = NAV.find(n => n.k === page);
 
   return (
@@ -2547,10 +2606,18 @@ export default function App() {
                   </div>
                   <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 13, color: "#f1f5f9" }}>{u.name}</div>
                   <div style={{ fontSize: 11, color: "#475569", marginTop: 3 }}>{u.email}</div>
-                  <div style={{ marginTop: 8 }}>
+                  <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 5 }}>
                     <span className="tag" style={{ background: u.role === "admin" ? "#1e1e3a" : "#1e3a2a", color: u.role === "admin" ? "#a78bfa" : "#34d399" }}>
-                      {u.role === "admin" ? "Admin" : "Técnico · " + u.discipline}
+                      {u.role === "admin" ? (u.full_access ? "Admin · Acceso Total" : "Admin · Módulos limitados") : "Técnico · " + u.discipline}
                     </span>
+                    {u.role === "admin" && !u.full_access && (u.modulos || []).length > 0 && (
+                      <div style={{ fontSize: 10, color: "#475569", lineHeight: 1.5 }}>
+                        {(u.modulos || []).map(m => {
+                          const mod = ALL_MODULOS.find(x => x.k === m);
+                          return mod ? <span key={m} style={{ display: "inline-block", background: "#0d1b2e", color: "#60a5fa", borderRadius: 4, padding: "1px 6px", marginRight: 3, marginBottom: 2 }}>{mod.l}</span> : null;
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -2573,7 +2640,7 @@ export default function App() {
       {modal === "newEquip" && <NewEquip locations={locations} onClose={closeModal} onSave={eq => { setEquipment(p => [...p, eq]); closeModal(); }} />}
       {modal === "newLoc" && <NewLoc onClose={closeModal} onSave={loc => { setLocations(p => [...p, loc]); closeModal(); }} />}
       {modal === "newJI" && <NewJI onClose={closeModal} onSave={ji => { setJis(p => [...p, ji]); closeModal(); }} />}
-      {modal === "newUser" && <NewUser onClose={closeModal} onSave={u => { setUsers(p => [...p, u]); closeModal(); }} />}
+      {modal === "newUser" && <NewUser onClose={closeModal} currentUser={user} onSave={u => { setUsers(p => [...p, u]); closeModal(); }} />}
       {modal === "importExcel" && <ExcelImport onClose={closeModal} onImported={async () => { const data = await db.getOTs(user.id, isAdmin, user.discipline); setOts(data); }} />}
       {modal === "importEquip" && <ImportEquip onClose={closeModal} onSave={eq => setEquipment(p => [...p, eq])} />}
       {modal === "editEquip" && selOT && <EditEquip eq={selOT} onClose={closeModal} onSave={updated => setEquipment(p => p.map(e => e.id === updated.id ? updated : e))} />}
