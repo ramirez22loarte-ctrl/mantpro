@@ -2046,6 +2046,11 @@ function TallerPage() {
       ...form,
       avance_inspeccion: form.avance_inspeccion === "" ? null : parseInt(form.avance_inspeccion) || 0,
       avance_reparacion: form.avance_reparacion === "" ? null : parseInt(form.avance_reparacion) || 0,
+      fecha_inicio_inspeccion: form.fecha_inicio_inspeccion || null,
+      fecha_final_inspeccion: form.fecha_final_inspeccion || null,
+      fecha_inicio_mantto: form.fecha_inicio_mantto || null,
+      fecha_final_mantto: form.fecha_final_mantto || null,
+      fecha_salida: form.fecha_salida || null,
     };
     if (editId) {
       await supabase.from("taller").update(payload).eq("id", editId);
