@@ -2044,7 +2044,7 @@ export default function App() {
 
   const isAdmin = user?.role === "admin";
   // Admins existentes sin full_access definido se tratan como acceso total
-  if (isAdmin && user.full_access === null || user.full_access === undefined) {
+  if (isAdmin && user && (user.full_access === null || user.full_access === undefined)) {
     user.full_access = true;
   }
   const myOTsAll = isAdmin ? ots : ots; // techs see all OTs of their discipline (filtered at DB level)
