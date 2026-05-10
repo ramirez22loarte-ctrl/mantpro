@@ -1745,11 +1745,12 @@ function SolpedPage() {
   }, []);
 
   const save = async () => {
+    const payload = { ...form, fecha_inicio: form.fecha_inicio || null, fecha_fin: form.fecha_fin || null };
     if (editId) {
-      await supabase.from("solped").update(form).eq("id", editId);
-      setItems(p => p.map(x => x.id === editId ? { ...x, ...form } : x));
+      await supabase.from("solped").update(payload).eq("id", editId);
+      setItems(p => p.map(x => x.id === editId ? { ...x, ...payload } : x));
     } else {
-      const { data, error } = await supabase.from("solped").insert(form).select("id,tipo,area,solped,actividad,avances,prioridad,avance_pct,estado,fecha_inicio,fecha_fin,archivo_url,created_at");
+      const { data, error } = await supabase.from("solped").insert(payload).select("id,tipo,area,solped,actividad,avances,prioridad,avance_pct,estado,fecha_inicio,fecha_fin,archivo_url,created_at");
       if (error) { console.error("Solped insert error:", error); return; }
       if (data && data[0]) setItems(p => [data[0], ...p]);
     }
@@ -1898,11 +1899,12 @@ function AvisosPage() {
   }, []);
 
   const save = async () => {
+    const payload = { ...form, fecha_reporte: form.fecha_reporte || null, fecha_fin: form.fecha_fin || null };
     if (editId) {
-      await supabase.from("avisos").update(form).eq("id", editId);
-      setItems(p => p.map(x => x.id === editId ? { ...x, ...form } : x));
+      await supabase.from("avisos").update(payload).eq("id", editId);
+      setItems(p => p.map(x => x.id === editId ? { ...x, ...payload } : x));
     } else {
-      const { data, error } = await supabase.from("avisos").insert(form).select("id,area,ot_aviso,n_aviso,actividad,acciones,prioridad,avance_pct,estado,fecha_reporte,fecha_fin,archivo_url,created_at");
+      const { data, error } = await supabase.from("avisos").insert(payload).select("id,area,ot_aviso,n_aviso,actividad,acciones,prioridad,avance_pct,estado,fecha_reporte,fecha_fin,archivo_url,created_at");
       if (error) { console.error("Avisos insert error:", error); return; }
       if (data && data[0]) setItems(p => [data[0], ...p]);
     }
