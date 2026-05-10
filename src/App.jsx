@@ -159,6 +159,7 @@ const ALL_MODULOS = [
   { k: "historico", l: "Importar Histórico" },
   { k: "solped", l: "SOLPED y Repuestos" },
   { k: "avisos", l: "Seguimiento Avisos" },
+  { k: "taller", l: "Taller" },
   { k: "users", l: "Usuarios" },
 ];
 
@@ -2024,6 +2025,174 @@ function AvisosPage() {
     </div>
   );
 }
+
+// ── TALLER PAGE ───────────────────────────────────────────────
+function TallerPage() {
+  const fileRefT = useRef();
+  const empty = { tipo_bomba: "", propiedad: "", serie: "", tag: "", avance_inspeccion: 0, avance_reparacion: 0, comentario: "", fecha_inicio_inspeccion: "", fecha_final_inspeccion: "", fecha_inicio_mantto: "", fecha_final_mantto: "", fecha_salida: "", responsable_salida: "", condicion: "", archivo_url: "" };
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState(empty);
+  const [editId, setEditId] = useState(null);
+  const s = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
+  useEffect(() => {
+    supabase.from("taller").select("*").order("created_at", { ascending: false }).then(({ data }) => { setItems(data || []); setLoading(false); });
+  }, []);
+
+  const save = async () => {
+    if (editId) {
+      const { data } = await supabase.from("taller").update(form).eq("id", editId).select().single();
+      if (data) setItems(p => p.map(x => x.id === editId ? data : x));
+    } else {
+      const { data } = await supabase.from("taller").insert(form).select().single();
+      if (data) setItems(p => [data, ...p]);
+    }
+    setShowForm(false); setEditId(null); setForm(empty);
+  };
+
+  const del = async (id) => {
+    if (!window.confirm("¿Eliminar este registro?")) return;
+    await supabase.from("taller").delete().eq("id", id);
+    setItems(p => p.filter(x => x.id !== id));
+  };
+
+  const exportExcel = () => {
+    const XLSX = window.XLSX;
+    if (!XLSX) return;
+    const ws = XLSX.utils.json_to_sheet(items.map(i => ({
+      "Tipo de Bomba": i.tipo_bomba, "Propiedad": i.propiedad, "Serie": i.serie, "Tag": i.tag,
+      "% Avance Inspección": i.avance_inspeccion, "% Avance Reparación": i.avance_reparacion,
+      "Comentario": i.comentario, "F. Inicio Inspección": i.fecha_inicio_inspeccion,
+      "F. Final Inspección": i.fecha_final_inspeccion, "F. Inicio Mantto": i.fecha_inicio_mantto,
+      "F. Final Mantto": i.fecha_final_mantto, "Fecha Salida": i.fecha_salida,
+      "Responsable de Salida": i.responsable_salida, "Condición": i.condicion,
+    })));
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Taller");
+    XLSX.writeFile(wb, "taller.xlsx");
+  };
+
+  return (
+    <div className="fd">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 15, color: "#f1f5f9" }}>🔩 Seguimiento de Mantenimiento en Taller</div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="btn" onClick={exportExcel} style={{ background: "#0f2040", color: "#34d399", padding: "7px 14px", fontSize: 13 }}>📊 Exportar Excel</button>
+          <button className="btn" onClick={() => { setForm(empty); setEditId(null); setShowForm(true); }} style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "7px 16px", fontSize: 13 }}>+ Agregar</button>
+        </div>
+      </div>
+
+      {showForm && (
+        <div className="ov" onClick={e => e.target === e.currentTarget && setShowForm(false)}>
+          <div className="mod fd" style={{ width: 660 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
+              <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 15, color: "#f1f5f9" }}>{editId ? "Editar" : "Nuevo"} Registro de Taller</div>
+              <button className="btn" onClick={() => setShowForm(false)} style={{ background: "#111c30", color: "#64748b", padding: "4px 10px" }}>✕</button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <Lbl l="Tipo de Bomba"><input className="inp" value={form.tipo_bomba} onChange={e => s("tipo_bomba", e.target.value)} placeholder="Ej: Centrífuga" /></Lbl>
+                <Lbl l="Propiedad"><input className="inp" value={form.propiedad} onChange={e => s("propiedad", e.target.value)} placeholder="Propietario" /></Lbl>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <Lbl l="Serie"><input className="inp" value={form.serie} onChange={e => s("serie", e.target.value)} placeholder="N° Serie" /></Lbl>
+                <Lbl l="Tag"><input className="inp" value={form.tag} onChange={e => s("tag", e.target.value)} placeholder="Tag del equipo" /></Lbl>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <Lbl l="% Avance de Inspección"><input className="inp" type="number" min="0" max="100" value={form.avance_inspeccion} onChange={e => s("avance_inspeccion", e.target.value)} /></Lbl>
+                <Lbl l="% Avance de Reparación"><input className="inp" type="number" min="0" max="100" value={form.avance_reparacion} onChange={e => s("avance_reparacion", e.target.value)} /></Lbl>
+              </div>
+              <Lbl l="Comentario"><textarea className="inp" rows={2} value={form.comentario} onChange={e => s("comentario", e.target.value)} style={{ resize: "vertical" }} /></Lbl>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <Lbl l="F. Inicio Inspección"><input className="inp" type="date" value={form.fecha_inicio_inspeccion} onChange={e => s("fecha_inicio_inspeccion", e.target.value)} /></Lbl>
+                <Lbl l="F. Final Inspección"><input className="inp" type="date" value={form.fecha_final_inspeccion} onChange={e => s("fecha_final_inspeccion", e.target.value)} /></Lbl>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <Lbl l="F. Inicio Mantto"><input className="inp" type="date" value={form.fecha_inicio_mantto} onChange={e => s("fecha_inicio_mantto", e.target.value)} /></Lbl>
+                <Lbl l="F. Final Mantto"><input className="inp" type="date" value={form.fecha_final_mantto} onChange={e => s("fecha_final_mantto", e.target.value)} /></Lbl>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <Lbl l="Fecha de Salida"><input className="inp" type="date" value={form.fecha_salida} onChange={e => s("fecha_salida", e.target.value)} /></Lbl>
+                <Lbl l="Responsable de Salida"><input className="inp" value={form.responsable_salida} onChange={e => s("responsable_salida", e.target.value)} placeholder="Nombre" /></Lbl>
+              </div>
+              <Lbl l="Condición"><input className="inp" value={form.condicion} onChange={e => s("condicion", e.target.value)} placeholder="Ej: Buena, Regular, Mala" /></Lbl>
+              <Lbl l="Adjuntar Archivo">
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input ref={fileRefT} type="file" style={{ display: "none" }} onChange={async e => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    const cleanName = file.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9._-]/g, "_");
+                    const fileName = Date.now() + "_" + cleanName;
+                    const { data, error } = await supabase.storage.from("adjuntos").upload(fileName, file);
+                    if (!error) {
+                      const { data: urlData } = supabase.storage.from("adjuntos").getPublicUrl(fileName);
+                      s("archivo_url", urlData.publicUrl);
+                    } else { console.error("Upload error:", error); }
+                  }} />
+                  <button className="btn" type="button" onClick={() => fileRefT.current?.click()} style={{ background: "#111c30", color: "#60a5fa", padding: "8px 14px", fontSize: 12 }}>📎 Seleccionar archivo</button>
+                  {form.archivo_url && <a href={form.archivo_url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: "#34d399" }}>✅ Archivo adjunto</a>}
+                </div>
+              </Lbl>
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                <button className="btn" onClick={() => setShowForm(false)} style={{ background: "#111c30", color: "#64748b", padding: "8px 16px", fontSize: 13 }}>Cancelar</button>
+                <button className="btn" onClick={save} style={{ background: "linear-gradient(135deg,#065f46,#0f766e)", color: "#34d399", padding: "8px 18px", fontSize: 13 }}>💾 Guardar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {loading ? <div style={{ color: "#475569", textAlign: "center", padding: 40 }}>Cargando...</div> : (
+        <div style={{ overflowX: "auto" }}>
+          <table className="ptable">
+            <thead><tr>{["Tipo Bomba","Propiedad","Serie","Tag","% Insp.","% Rep.","Comentario","F.Ini.Insp","F.Fin.Insp","F.Ini.Mant","F.Fin.Mant","F.Salida","Responsable","Condición","Archivo","Acciones"].map(h => <th key={h}>{h}</th>)}</tr></thead>
+            <tbody>
+              {items.length === 0 ? <tr><td colSpan={16} style={{ textAlign: "center", color: "#334155", padding: 24 }}>Sin registros aún.</td></tr> :
+              items.map(item => (
+                <tr key={item.id}>
+                  <td style={{ color: "#94a3b8" }}>{item.tipo_bomba}</td>
+                  <td style={{ color: "#94a3b8" }}>{item.propiedad}</td>
+                  <td style={{ color: "#60a5fa", fontWeight: 700 }}>{item.serie}</td>
+                  <td style={{ color: "#60a5fa", fontWeight: 700 }}>{item.tag}</td>
+                  <td>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <div style={{ background: "#111c30", borderRadius: 99, height: 6, width: 50, overflow: "hidden" }}>
+                        <div style={{ height: "100%", background: item.avance_inspeccion >= 100 ? "#34d399" : "#3b82f6", width: item.avance_inspeccion + "%" }} />
+                      </div>
+                      <span style={{ fontSize: 11, color: "#64748b" }}>{item.avance_inspeccion}%</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <div style={{ background: "#111c30", borderRadius: 99, height: 6, width: 50, overflow: "hidden" }}>
+                        <div style={{ height: "100%", background: item.avance_reparacion >= 100 ? "#34d399" : "#f97316", width: item.avance_reparacion + "%" }} />
+                      </div>
+                      <span style={{ fontSize: 11, color: "#64748b" }}>{item.avance_reparacion}%</span>
+                    </div>
+                  </td>
+                  <td style={{ color: "#94a3b8", fontSize: 11 }}>{item.comentario}</td>
+                  <td style={{ color: "#475569", fontSize: 11 }}>{item.fecha_inicio_inspeccion}</td>
+                  <td style={{ color: "#475569", fontSize: 11 }}>{item.fecha_final_inspeccion}</td>
+                  <td style={{ color: "#475569", fontSize: 11 }}>{item.fecha_inicio_mantto}</td>
+                  <td style={{ color: "#475569", fontSize: 11 }}>{item.fecha_final_mantto}</td>
+                  <td style={{ color: "#475569", fontSize: 11 }}>{item.fecha_salida}</td>
+                  <td style={{ color: "#cbd5e1" }}>{item.responsable_salida}</td>
+                  <td style={{ color: "#94a3b8" }}>{item.condicion}</td>
+                  <td>{item.archivo_url ? <a href={item.archivo_url} target="_blank" rel="noreferrer" style={{ color: "#34d399", fontSize: 11 }}>📎 Ver</a> : <span style={{ color: "#334155", fontSize: 11 }}>—</span>}</td>
+                  <td style={{ display: "flex", gap: 5 }}>
+                    <button className="btn" onClick={() => { setForm({ tipo_bomba: item.tipo_bomba||"", propiedad: item.propiedad||"", serie: item.serie||"", tag: item.tag||"", avance_inspeccion: item.avance_inspeccion||0, avance_reparacion: item.avance_reparacion||0, comentario: item.comentario||"", fecha_inicio_inspeccion: item.fecha_inicio_inspeccion||"", fecha_final_inspeccion: item.fecha_final_inspeccion||"", fecha_inicio_mantto: item.fecha_inicio_mantto||"", fecha_final_mantto: item.fecha_final_mantto||"", fecha_salida: item.fecha_salida||"", responsable_salida: item.responsable_salida||"", condicion: item.condicion||"", archivo_url: item.archivo_url||"" }); setEditId(item.id); setShowForm(true); }} style={{ background: "#0f2040", color: "#60a5fa", padding: "3px 9px", fontSize: 11 }}>✏️</button>
+                    <button className="btn" onClick={() => del(item.id)} style={{ background: "#3b0f0f", color: "#f87171", padding: "3px 9px", fontSize: 11 }}>🗑️</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
 export default function App() {
   const [user, setUser] = useState(null);
   const [locations, setLocations] = useState([]);
@@ -2100,6 +2269,7 @@ export default function App() {
     { k: "historico", i: "📥", l: "Importar Histórico" },
     { k: "solped", i: "🔧", l: "SOLPED y Repuestos" },
     { k: "avisos", i: "🔔", l: "Seguimiento Avisos" },
+    { k: "taller", i: "🔩", l: "Taller" },
     { k: "users", i: "👥", l: "Usuarios" },
   ];
   const TECH_NAV = [
@@ -2365,6 +2535,7 @@ export default function App() {
           {page === "historico" && isAdmin && <ImportHistorico equipment={equipment} />}
           {page === "solped" && isAdmin && <SolpedPage />}
           {page === "avisos" && isAdmin && <AvisosPage />}
+          {page === "taller" && isAdmin && <TallerPage />}
 
           {page === "verificacion" && isAdmin && (() => {
             // Group readings by OT
