@@ -1765,12 +1765,13 @@ function SolpedPage() {
                   <input ref={fileRef} type="file" style={{ display: "none" }} onChange={async e => {
                     const file = e.target.files[0];
                     if (!file) return;
-                    const fileName = Date.now() + "_" + file.name;
+                    const cleanName = file.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9._-]/g, "_");
+                    const fileName = Date.now() + "_" + cleanName;
                     const { data, error } = await supabase.storage.from("adjuntos").upload(fileName, file);
                     if (!error) {
                       const { data: urlData } = supabase.storage.from("adjuntos").getPublicUrl(fileName);
                       s("archivo_url", urlData.publicUrl);
-                    }
+                    } else { console.error("Upload error:", error); }
                   }} />
                   <button className="btn" type="button" onClick={() => fileRef.current?.click()} style={{ background: "#111c30", color: "#60a5fa", padding: "8px 14px", fontSize: 12 }}>📎 Seleccionar archivo</button>
                   {form.archivo_url && <a href={form.archivo_url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: "#34d399" }}>✅ Archivo adjunto</a>}
@@ -1912,12 +1913,13 @@ function AvisosPage() {
                   <input ref={fileRefA} type="file" style={{ display: "none" }} onChange={async e => {
                     const file = e.target.files[0];
                     if (!file) return;
-                    const fileName = Date.now() + "_" + file.name;
+                    const cleanName = file.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9._-]/g, "_");
+                    const fileName = Date.now() + "_" + cleanName;
                     const { data, error } = await supabase.storage.from("adjuntos").upload(fileName, file);
                     if (!error) {
                       const { data: urlData } = supabase.storage.from("adjuntos").getPublicUrl(fileName);
                       s("archivo_url", urlData.publicUrl);
-                    }
+                    } else { console.error("Upload error:", error); }
                   }} />
                   <button className="btn" type="button" onClick={() => fileRefA.current?.click()} style={{ background: "#111c30", color: "#60a5fa", padding: "8px 14px", fontSize: 12 }}>📎 Seleccionar archivo</button>
                   {form.archivo_url && <a href={form.archivo_url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: "#34d399" }}>✅ Archivo adjunto</a>}
