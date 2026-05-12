@@ -1829,6 +1829,7 @@ function SolpedPage() {
                   }} />
                   <button className="btn" type="button" onClick={() => fileRef.current?.click()} style={{ background: "#111c30", color: "#60a5fa", padding: "8px 14px", fontSize: 12 }}>📎 Seleccionar archivo</button>
                   {form.archivo_url && <a href={form.archivo_url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: "#34d399" }}>✅ Archivo adjunto</a>}
+                  {form.archivo_url && <button className="btn" type="button" onClick={() => s("archivo_url", "")} style={{ background: "#3b0f0f", color: "#f87171", padding: "6px 10px", fontSize: 11 }}>🗑️ Eliminar</button>}
                 </div>
               </Lbl>
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
@@ -1979,6 +1980,7 @@ function AvisosPage() {
                   }} />
                   <button className="btn" type="button" onClick={() => fileRefA.current?.click()} style={{ background: "#111c30", color: "#60a5fa", padding: "8px 14px", fontSize: 12 }}>📎 Seleccionar archivo</button>
                   {form.archivo_url && <a href={form.archivo_url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: "#34d399" }}>✅ Archivo adjunto</a>}
+                  {form.archivo_url && <button className="btn" type="button" onClick={() => s("archivo_url", "")} style={{ background: "#3b0f0f", color: "#f87171", padding: "6px 10px", fontSize: 11 }}>🗑️ Eliminar</button>}
                 </div>
               </Lbl>
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
@@ -2147,6 +2149,7 @@ function TallerPage() {
                   }} />
                   <button className="btn" type="button" onClick={() => fileRefT.current?.click()} style={{ background: "#111c30", color: "#60a5fa", padding: "8px 14px", fontSize: 12 }}>📎 Seleccionar archivo</button>
                   {form.archivo_url && <a href={form.archivo_url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: "#34d399" }}>✅ Archivo adjunto</a>}
+                  {form.archivo_url && <button className="btn" type="button" onClick={() => s("archivo_url", "")} style={{ background: "#3b0f0f", color: "#f87171", padding: "6px 10px", fontSize: 11 }}>🗑️ Eliminar</button>}
                 </div>
               </Lbl>
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
