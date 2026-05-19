@@ -1503,6 +1503,66 @@ function DashboardOperativo({ allReadings, equipment, onRefresh }) {
         ))}
       </div>
 
+      {/* EFICIENCIA POR TAG */}
+      {(() => {
+        // Get unique TAGs from filtered readings
+        const tags = [...new Set(filtered.map(r => {
+          const desc = r.work_orders?.description || "";
+          const parts = desc.split("|");
+          return parts[0]?.trim().toUpperCase();
+        }).filter(Boolean))];
+
+        if (tags.length === 0) return null;
+
+        const calcEficiencia = (tag) => {
+          const tagReadings = filtered.filter(r => {
+            const desc = r.work_orders?.description || "";
+            return desc.split("|")[0]?.trim().toUpperCase() === tag;
+          });
+
+          const getLastVal = (paramName) => {
+            const r = tagReadings.filter(x => x.parameters?.name === paramName).slice(-1)[0];
+            return r ? parseFloat(r.value) : null;
+          };
+
+          const caudal = getLastVal("Caudal");       // L/s
+          const presion = getLastVal("Presión");     // PSI
+          const potencia = getLastVal("Potencia");   // kW
+
+          if (!caudal || !presion || !potencia || potencia === 0) return null;
+
+          const Q = caudal / 1000;                   // m³/s
+          const P = presion * 0.704;                 // mca
+          const PB_W = 9807 * Q * P;                // W
+          const PB_HP = (PB_W / 1000) * 1.34102;   // HP
+          const POT_HP = potencia * 1.34102;         // HP
+          return (PB_HP / POT_HP) * 100;
+        };
+
+        return (
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "#34d399", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+              ⚡ Eficiencia Motor-Bomba por TAG <div style={{ flex: 1, height: 1, background: "#1a2740" }} />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))", gap: 10 }}>
+              {tags.map(tag => {
+                const ef = calcEficiencia(tag);
+                const color = ef === null ? "#475569" : ef >= 75 ? "#34d399" : ef >= 60 ? "#facc15" : "#f87171";
+                return (
+                  <div key={tag} className="card" style={{ borderLeft: "3px solid " + color, textAlign: "center" }}>
+                    <div style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>🏷️ {tag}</div>
+                    <div style={{ fontFamily: "Syne,sans-serif", fontSize: 26, fontWeight: 800, color }}>
+                      {ef === null ? "N/D" : ef.toFixed(1) + "%"}
+                    </div>
+                    <div style={{ fontSize: 10, color: "#475569", marginTop: 2 }}>Eficiencia ηT</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       <div style={{ fontSize: 11, fontWeight: 600, color: "#f97316", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
         ⚙️ Parámetros Mecánicos <div style={{ flex: 1, height: 1, background: "#1a2740" }} />
       </div>
