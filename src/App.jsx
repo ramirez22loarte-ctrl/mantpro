@@ -1274,14 +1274,15 @@ function ManualReadingForm({ onClose, equipment, onSaved }) {
 
       if (!otId) {
         const eq = equipment.find(e => e.code === tag);
+        const newId = crypto.randomUUID();
         const { data: newOt, error: otErr } = await supabase.from("work_orders").insert({
+          id: newId,
           title: `Manual - ${tag}`,
           description: `${tag}|${eq?.area || "MANUAL"}|${eq?.subarea || ""}|Ingreso Manual`,
           discipline: "Mecánico", status: "open", equipment_id: eq?.id || null,
-          assigned_to: null, location_id: null,
         }).select("id");
         if (otErr) { setMsg("Error al crear OT: " + otErr.message); setSaving(false); return; }
-        otId = newOt && newOt[0] ? newOt[0].id : null;
+        otId = newOt && newOt[0] ? newOt[0].id : newId;
       }
 
       if (!otId) { setMsg("Error al obtener OT."); setSaving(false); return; }
