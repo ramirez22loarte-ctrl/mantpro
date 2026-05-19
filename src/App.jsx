@@ -1581,6 +1581,51 @@ function DashboardOperativo({ allReadings, equipment, onRefresh }) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 12, marginBottom: 20 }}>
         {INST_PARAMS.map(p => <ParamChart key={p.name} paramName={p.name} unit={p.unit} color={p.color} allReadings={filtered} />)}
       </div>
+
+      {/* TABLA DE LECTURAS INGRESADAS */}
+      {filtered.length > 0 && (
+        <div style={{ marginTop: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+            📋 Lecturas Ingresadas <div style={{ flex: 1, height: 1, background: "#1a2740" }} />
+          </div>
+          <div style={{ overflowX: "auto" }}>
+            <table className="ptable">
+              <thead>
+                <tr>
+                  <th>TAG</th>
+                  <th>Parámetro</th>
+                  <th>Valor</th>
+                  <th>Unidad</th>
+                  <th>Fecha</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(r => {
+                  const desc = r.work_orders?.description || "";
+                  const tag = desc.split("|")[0]?.trim().toUpperCase() || "—";
+                  return (
+                    <tr key={r.id}>
+                      <td style={{ color: "#60a5fa", fontWeight: 700 }}>{tag}</td>
+                      <td style={{ color: "#94a3b8" }}>{r.parameters?.name || "—"}</td>
+                      <td style={{ color: "#f1f5f9", fontWeight: 600 }}>{r.value}</td>
+                      <td style={{ color: "#475569" }}>{r.parameters?.unit || "—"}</td>
+                      <td style={{ color: "#475569", fontSize: 11 }}>{r.created_at ? new Date(r.created_at).toLocaleDateString("es-CO") : "—"}</td>
+                      <td>
+                        <button className="btn" onClick={async () => {
+                          if (!window.confirm("¿Eliminar esta lectura?")) return;
+                          await supabase.from("readings").delete().eq("id", r.id);
+                          if (onRefresh) onRefresh();
+                        }} style={{ background: "#3b0f0f", color: "#f87171", padding: "3px 9px", fontSize: 11 }}>🗑️</button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
