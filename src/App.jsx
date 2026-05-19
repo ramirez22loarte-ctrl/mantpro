@@ -1195,6 +1195,10 @@ const MEC_PARAMS = [
   { name: "T° Lado Acople Bomba", unit: "°C", color: "#34d399" },
   { name: "Vibración Axial Bomba", unit: "mm/s", color: "#60a5fa" },
   { name: "Vibración Axial Motor", unit: "mm/s", color: "#a78bfa" },
+  { name: "Vibración (V): Lado Libre Motor", unit: "mm/s", color: "#fb923c" },
+  { name: "Vibración (V): Lado Acople Motor", unit: "mm/s", color: "#f43f5e" },
+  { name: "Vibración (V): Lado Libre Bomba", unit: "mm/s", color: "#4ade80" },
+  { name: "Vibración (V): Lado Acople Bomba", unit: "mm/s", color: "#2dd4bf" },
 ];
 const ELEC_PARAMS = [
   { name: "Corriente Fase I", unit: "A", color: "#facc15" },
@@ -1242,8 +1246,112 @@ function ParamChart({ paramName, unit, color, allReadings }) {
   );
 }
 
-function DashboardOperativo({ allReadings, equipment }) {
+
+// ── INGRESO MANUAL DE LECTURAS ────────────────────────────────
+function ManualReadingForm({ onClose, equipment, onSaved }) {
+  const [tag, setTag] = useState("");
+  const [fecha, setFecha] = useState(new Date().toISOString().split("T")[0]);
+  const [vals, setVals] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const allParams = [
+    ...MEC_PARAMS.map(p => ({ ...p, grupo: "Mecánico" })),
+    ...ELEC_PARAMS.map(p => ({ ...p, grupo: "Eléctrico" })),
+    ...INST_PARAMS.map(p => ({ ...p, grupo: "Instrumentación" })),
+  ];
+
+  const tags = [...new Set(equipment.map(e => e.code).filter(Boolean))].sort();
+
+  const save = async () => {
+    const toSave = allParams.filter(p => vals[p.name] !== undefined && vals[p.name] !== "");
+    if (!toSave.length) { setMsg("Ingresa al menos un valor."); return; }
+    setSaving(true); setMsg("");
+    try {
+      // Find or create work_order for this tag (manual entry)
+      let { data: ots } = await supabase.from("work_orders").select("id,description").ilike("description", `${tag}|%`).limit(1);
+      let otId = ots && ots[0] ? ots[0].id : null;
+
+      if (!otId) {
+        const eq = equipment.find(e => e.code === tag);
+        const { data: newOt } = await supabase.from("work_orders").insert({
+          title: `Lectura Manual - ${tag}`,
+          description: `${tag}|${eq?.area || ""}|${eq?.subarea || ""}|Ingreso Manual`,
+          discipline: "Mecánico", status: "open", equipment_id: eq?.id || null
+        }).select("id").single();
+        otId = newOt?.id;
+      }
+
+      if (!otId) { setMsg("Error al obtener OT."); setSaving(false); return; }
+
+      // For each param with value, find or create parameter record
+      for (const p of toSave) {
+        let { data: params } = await supabase.from("parameters").select("id").eq("ot_id", otId).eq("name", p.name).limit(1);
+        let paramId = params && params[0] ? params[0].id : null;
+        if (!paramId) {
+          const { data: newP } = await supabase.from("parameters").insert({ name: p.name, unit: p.unit, ot_id: otId, expected: "", sort_order: 0 }).select("id").single();
+          paramId = newP?.id;
+        }
+        if (paramId) {
+          await supabase.from("readings").insert({ parameter_id: paramId, ot_id: otId, value: vals[p.name], recorded_by: null, created_at: new Date(fecha).toISOString() });
+        }
+      }
+      setMsg("✅ Lecturas guardadas correctamente.");
+      setTimeout(() => { onSaved(); onClose(); }, 1200);
+    } catch(e) { setMsg("Error: " + e.message); }
+    setSaving(false);
+  };
+
+  const grupos = ["Mecánico", "Eléctrico", "Instrumentación"];
+  const colores = { "Mecánico": "#f97316", "Eléctrico": "#facc15", "Instrumentación": "#22d3ee" };
+
+  return (
+    <div className="ov" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="mod fd" style={{ width: 700, maxHeight: "85vh", overflowY: "auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
+          <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 15, color: "#f1f5f9" }}>📊 Ingreso Manual de Lecturas</div>
+          <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "4px 10px" }}>✕</button>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+          <Lbl l="TAG / Equipo">
+            <select className="inp" value={tag} onChange={e => setTag(e.target.value)}>
+              <option value="">Seleccionar TAG...</option>
+              {tags.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </Lbl>
+          <Lbl l="Fecha de Lectura">
+            <input className="inp" type="date" value={fecha} onChange={e => setFecha(e.target.value)} />
+          </Lbl>
+        </div>
+        {grupos.map(grupo => (
+          <div key={grupo} style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: colores[grupo], textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
+              {grupo} <div style={{ flex: 1, height: 1, background: "#1a2740" }} />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 8 }}>
+              {allParams.filter(p => p.grupo === grupo).map(p => (
+                <Lbl key={p.name} l={`${p.name} (${p.unit})`}>
+                  <input className="inp" type="number" step="any" placeholder="—" value={vals[p.name] || ""} onChange={e => setVals(prev => ({ ...prev, [p.name]: e.target.value }))} />
+                </Lbl>
+              ))}
+            </div>
+          </div>
+        ))}
+        {msg && <div style={{ fontSize: 12, color: msg.startsWith("✅") ? "#34d399" : "#f87171", background: msg.startsWith("✅") ? "#0d2d1f" : "#3b0f0f", padding: "8px 12px", borderRadius: 7, marginBottom: 10 }}>{msg}</div>}
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+          <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "8px 16px", fontSize: 13 }}>Cancelar</button>
+          <button className="btn" onClick={save} disabled={saving || !tag} style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "8px 20px", fontSize: 13 }}>
+            {saving ? "Guardando..." : "💾 Guardar Lecturas"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DashboardOperativo({ allReadings, equipment, onRefresh }) {
   const [filterFecha, setFilterFecha] = useState("");
+  const [showManual, setShowManual] = useState(false);
   const [filterTag, setFilterTag] = useState("");
   const [filterArea, setFilterArea] = useState("");
   const [filterSubarea, setFilterSubarea] = useState("");
@@ -1326,6 +1434,10 @@ function DashboardOperativo({ allReadings, equipment }) {
 
   return (
     <div className="fd">
+      {showManual && <ManualReadingForm onClose={() => setShowManual(false)} equipment={equipment} onSaved={() => onRefresh && onRefresh()} />}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+        <button className="btn" onClick={() => setShowManual(true)} style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "8px 18px", fontSize: 13 }}>+ Agregar Lectura</button>
+      </div>
       {/* FILTROS */}
       <div className="card" style={{ marginBottom: 18, padding: "14px 18px" }}>
         <div style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 12 }}>🔽 Filtros</div>
@@ -2549,7 +2661,7 @@ export default function App() {
             </div>
           )}
 
-          {page === "dashboard_op" && isAdmin && <DashboardOperativo allReadings={allReadings} equipment={equipment} />}
+          {page === "dashboard_op" && isAdmin && <DashboardOperativo allReadings={allReadings} equipment={equipment} onRefresh={() => db.getAllReadings().then(setAllReadings)} />}
           {page === "historico" && isAdmin && <ImportHistorico equipment={equipment} />}
           {page === "solped" && isAdmin && <SolpedPage />}
           {page === "avisos" && isAdmin && <AvisosPage />}
