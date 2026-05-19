@@ -1584,6 +1584,79 @@ function DashboardOperativo({ allReadings, equipment, onRefresh }) {
         {INST_PARAMS.map(p => <ParamChart key={p.name} paramName={p.name} unit={p.unit} color={p.color} allReadings={filtered} />)}
       </div>
 
+      {/* GRÁFICO DE EFICIENCIA */}
+      {(() => {
+        const tags = [...new Set(filtered.map(r => {
+          const desc = r.work_orders?.description || "";
+          return desc.split("|")[0]?.trim().toUpperCase();
+        }).filter(Boolean))];
+
+        if (tags.length === 0) return null;
+
+        // Build chart data: group by fecha, calc efficiency per tag
+        const fechas = [...new Set(filtered.map(r => r.created_at ? r.created_at.split("T")[0] : null).filter(Boolean))].sort();
+
+        const chartData = fechas.map(fecha => {
+          const point = { fecha };
+          tags.forEach(tag => {
+            const tagReadings = filtered.filter(r => {
+              const desc = r.work_orders?.description || "";
+              const rTag = desc.split("|")[0]?.trim().toUpperCase();
+              const rFecha = r.created_at ? r.created_at.split("T")[0] : null;
+              return rTag === tag && rFecha === fecha;
+            });
+            const getVal = (name) => {
+              const r = tagReadings.filter(x => x.parameters?.name === name).slice(-1)[0];
+              return r ? parseFloat(r.value) : null;
+            };
+            const caudal = getVal("Caudal");
+            const presion = getVal("Presión");
+            const potencia = getVal("Potencia");
+            if (caudal && presion && potencia && potencia > 0) {
+              const Q = caudal / 1000;
+              const P = presion * 0.704;
+              const PB_HP = ((9807 * Q * P) / 1000) * 1.34102;
+              const POT_HP = potencia * 1.34102;
+              point[tag] = parseFloat(((PB_HP / POT_HP) * 100).toFixed(2));
+            } else {
+              point[tag] = null;
+            }
+          });
+          return point;
+        }).filter(p => tags.some(t => p[t] !== null));
+
+        if (chartData.length === 0) return null;
+
+        const TAG_COLORS = ["#34d399","#60a5fa","#f97316","#a78bfa","#facc15","#f87171","#22d3ee"];
+
+        return (
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "#34d399", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+              📈 Historial de Eficiencia ηT (%) <div style={{ flex: 1, height: 1, background: "#1a2740" }} />
+            </div>
+            <div className="card" style={{ padding: 16 }}>
+              <ResponsiveContainer width="100%" height={260}>
+                <LineChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e3a5f" />
+                  <XAxis dataKey="fecha" tick={{ fill: "#475569", fontSize: 10 }} />
+                  <YAxis domain={[0, 100]} tick={{ fill: "#475569", fontSize: 10 }} unit="%" />
+                  <Tooltip
+                    contentStyle={{ background: "#0d1b2e", border: "1px solid #1e3a5f", borderRadius: 8 }}
+                    labelStyle={{ color: "#94a3b8" }}
+                    formatter={(v, name) => [`${v}%`, name]}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 11, color: "#94a3b8" }} />
+                  {tags.map((tag, i) => (
+                    <Line key={tag} type="monotone" dataKey={tag} stroke={TAG_COLORS[i % TAG_COLORS.length]}
+                      strokeWidth={2} dot={{ r: 4 }} connectNulls={false} />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* TABLA DE LECTURAS INGRESADAS */}
       {filtered.length > 0 && (
         <div style={{ marginTop: 8 }}>
