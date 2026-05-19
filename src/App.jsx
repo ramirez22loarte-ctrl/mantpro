@@ -1274,26 +1274,27 @@ function ManualReadingForm({ onClose, equipment, onSaved }) {
 
       if (!otId) {
         const eq = equipment.find(e => e.code === tag);
-        const { data: newOt } = await supabase.from("work_orders").insert({
-          title: `Lectura Manual - ${tag}`,
-          description: `${tag}|${eq?.area || ""}|${eq?.subarea || ""}|Ingreso Manual`,
-          discipline: "Mecánico", status: "open", equipment_id: eq?.id || null
-        }).select("id").single();
-        otId = newOt?.id;
+        const { data: newOt, error: otErr } = await supabase.from("work_orders").insert({
+          title: `Manual - ${tag}`,
+          description: `${tag}|${eq?.area || "MANUAL"}|${eq?.subarea || ""}|Ingreso Manual`,
+          discipline: "Mecánico", status: "open", equipment_id: eq?.id || null,
+          assigned_to: null, location_id: null,
+        }).select("id");
+        if (otErr) { setMsg("Error al crear OT: " + otErr.message); setSaving(false); return; }
+        otId = newOt && newOt[0] ? newOt[0].id : null;
       }
 
       if (!otId) { setMsg("Error al obtener OT."); setSaving(false); return; }
 
-      // For each param with value, find or create parameter record
       for (const p of toSave) {
         let { data: params } = await supabase.from("parameters").select("id").eq("ot_id", otId).eq("name", p.name).limit(1);
         let paramId = params && params[0] ? params[0].id : null;
         if (!paramId) {
-          const { data: newP } = await supabase.from("parameters").insert({ name: p.name, unit: p.unit, ot_id: otId, expected: "", sort_order: 0 }).select("id").single();
-          paramId = newP?.id;
+          const { data: newP } = await supabase.from("parameters").insert({ name: p.name, unit: p.unit, ot_id: otId, expected: "", sort_order: 0 }).select("id");
+          paramId = newP && newP[0] ? newP[0].id : null;
         }
         if (paramId) {
-          await supabase.from("readings").insert({ parameter_id: paramId, ot_id: otId, value: vals[p.name], recorded_by: null, created_at: new Date(fecha).toISOString() });
+          await supabase.from("readings").insert({ parameter_id: paramId, ot_id: otId, value: String(vals[p.name]), recorded_by: null, created_at: new Date(fecha).toISOString() });
         }
       }
       setMsg("✅ Lecturas guardadas correctamente.");
