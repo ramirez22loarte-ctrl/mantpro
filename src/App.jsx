@@ -2406,8 +2406,6 @@ function TallerPage() {
               </div>
               <Lbl l="Ubicación Actual"><input className="inp" value={form.ubicacion_actual} onChange={e => s("ubicacion_actual", e.target.value)} placeholder="Ubicación actual del equipo" /></Lbl>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 <Lbl l="Serie"><input className="inp" value={form.serie} onChange={e => s("serie", e.target.value)} placeholder="N° Serie" /></Lbl>
                 <Lbl l="Tag"><input className="inp" value={form.tag} onChange={e => s("tag", e.target.value)} placeholder="Tag del equipo" /></Lbl>
               </div>
