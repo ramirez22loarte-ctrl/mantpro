@@ -2327,7 +2327,7 @@ function AvisosPage() {
 // ── TALLER PAGE ───────────────────────────────────────────────
 function TallerPage() {
   const fileRefT = useRef();
-  const empty = { tipo_bomba: "", propiedad: "", serie: "", tag: "", avance_inspeccion: 0, avance_reparacion: 0, comentario: "", fecha_inicio_inspeccion: "", fecha_final_inspeccion: "", fecha_inicio_mantto: "", fecha_final_mantto: "", fecha_salida: "", responsable_salida: "", condicion: "", archivo_url: "" };
+  const empty = { tipo_bomba: "", propiedad: "", ubicacion_actual: "", serie: "", tag: "", avance_inspeccion: 0, avance_reparacion: 0, comentario: "", fecha_inicio_inspeccion: "", fecha_final_inspeccion: "", fecha_inicio_mantto: "", fecha_final_mantto: "", fecha_salida: "", responsable_salida: "", condicion: "", archivo_url: "" };
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -2404,6 +2404,9 @@ function TallerPage() {
                 <Lbl l="Tipo de Bomba"><input className="inp" value={form.tipo_bomba} onChange={e => s("tipo_bomba", e.target.value)} placeholder="Ej: Centrífuga" /></Lbl>
                 <Lbl l="Propiedad"><input className="inp" value={form.propiedad} onChange={e => s("propiedad", e.target.value)} placeholder="Propietario" /></Lbl>
               </div>
+              <Lbl l="Ubicación Actual"><input className="inp" value={form.ubicacion_actual} onChange={e => s("ubicacion_actual", e.target.value)} placeholder="Ubicación actual del equipo" /></Lbl>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 <Lbl l="Serie"><input className="inp" value={form.serie} onChange={e => s("serie", e.target.value)} placeholder="N° Serie" /></Lbl>
                 <Lbl l="Tag"><input className="inp" value={form.tag} onChange={e => s("tag", e.target.value)} placeholder="Tag del equipo" /></Lbl>
@@ -2456,13 +2459,14 @@ function TallerPage() {
       {loading ? <div style={{ color: "#475569", textAlign: "center", padding: 40 }}>Cargando...</div> : (
         <div style={{ overflowX: "auto" }}>
           <table className="ptable">
-            <thead><tr>{["Tipo Bomba","Propiedad","Serie","Tag","% Insp.","% Rep.","Comentario","F.Ini.Insp","F.Fin.Insp","F.Ini.Mant","F.Fin.Mant","F.Salida","Responsable","Condición","Archivo","Acciones"].map(h => <th key={h}>{h}</th>)}</tr></thead>
+            <thead><tr>{["Tipo Bomba","Propiedad","Ubicación","Serie","Tag","% Insp.","% Rep.","Comentario","F.Ini.Insp","F.Fin.Insp","F.Ini.Mant","F.Fin.Mant","F.Salida","Responsable","Condición","Archivo","Acciones"].map(h => <th key={h}>{h}</th>)}</tr></thead>
             <tbody>
-              {items.length === 0 ? <tr><td colSpan={16} style={{ textAlign: "center", color: "#334155", padding: 24 }}>Sin registros aún.</td></tr> :
+              {items.length === 0 ? <tr><td colSpan={17} style={{ textAlign: "center", color: "#334155", padding: 24 }}>Sin registros aún.</td></tr> :
               items.map(item => (
                 <tr key={item.id}>
                   <td style={{ color: "#94a3b8" }}>{item.tipo_bomba}</td>
                   <td style={{ color: "#94a3b8" }}>{item.propiedad}</td>
+                  <td style={{ color: "#94a3b8" }}>{item.ubicacion_actual}</td>
                   <td style={{ color: "#60a5fa", fontWeight: 700 }}>{item.serie}</td>
                   <td style={{ color: "#60a5fa", fontWeight: 700 }}>{item.tag}</td>
                   <td>
@@ -2491,7 +2495,7 @@ function TallerPage() {
                   <td style={{ color: "#94a3b8" }}>{item.condicion}</td>
                   <td>{item.archivo_url ? <a href={item.archivo_url} target="_blank" rel="noreferrer" style={{ color: "#34d399", fontSize: 11 }}>📎 Ver</a> : <span style={{ color: "#334155", fontSize: 11 }}>—</span>}</td>
                   <td style={{ display: "flex", gap: 5 }}>
-                    <button className="btn" onClick={() => { setForm({ tipo_bomba: item.tipo_bomba||"", propiedad: item.propiedad||"", serie: item.serie||"", tag: item.tag||"", avance_inspeccion: item.avance_inspeccion||0, avance_reparacion: item.avance_reparacion||0, comentario: item.comentario||"", fecha_inicio_inspeccion: item.fecha_inicio_inspeccion||"", fecha_final_inspeccion: item.fecha_final_inspeccion||"", fecha_inicio_mantto: item.fecha_inicio_mantto||"", fecha_final_mantto: item.fecha_final_mantto||"", fecha_salida: item.fecha_salida||"", responsable_salida: item.responsable_salida||"", condicion: item.condicion||"", archivo_url: item.archivo_url||"" }); setEditId(item.id); setShowForm(true); }} style={{ background: "#0f2040", color: "#60a5fa", padding: "3px 9px", fontSize: 11 }}>✏️</button>
+                    <button className="btn" onClick={() => { setForm({ tipo_bomba: item.tipo_bomba||"", propiedad: item.propiedad||"", ubicacion_actual: item.ubicacion_actual||"", serie: item.serie||"", tag: item.tag||"", avance_inspeccion: item.avance_inspeccion||0, avance_reparacion: item.avance_reparacion||0, comentario: item.comentario||"", fecha_inicio_inspeccion: item.fecha_inicio_inspeccion||"", fecha_final_inspeccion: item.fecha_final_inspeccion||"", fecha_inicio_mantto: item.fecha_inicio_mantto||"", fecha_final_mantto: item.fecha_final_mantto||"", fecha_salida: item.fecha_salida||"", responsable_salida: item.responsable_salida||"", condicion: item.condicion||"", archivo_url: item.archivo_url||"" }); setEditId(item.id); setShowForm(true); }} style={{ background: "#0f2040", color: "#60a5fa", padding: "3px 9px", fontSize: 11 }}>✏️</button>
                     <button className="btn" onClick={() => del(item.id)} style={{ background: "#3b0f0f", color: "#f87171", padding: "3px 9px", fontSize: 11 }}>🗑️</button>
                   </td>
                 </tr>
