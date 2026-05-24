@@ -2336,7 +2336,7 @@ function TallerPage() {
   const s = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
   useEffect(() => {
-    supabase.from("taller").select("id,tipo_bomba,propiedad,serie,tag,avance_inspeccion,avance_reparacion,comentario,fecha_inicio_inspeccion,fecha_final_inspeccion,fecha_inicio_mantto,fecha_final_mantto,fecha_salida,responsable_salida,condicion,archivo_url,created_at").order("created_at", { ascending: false }).then(({ data, error }) => { if (error) { console.error("Taller error:", JSON.stringify(error)); setLoading(false); return; } setItems(data || []); setLoading(false); });
+    supabase.from("taller").select("id,tipo_bomba,propiedad,ubicacion_actual,serie,tag,avance_inspeccion,avance_reparacion,comentario,fecha_inicio_inspeccion,fecha_final_inspeccion,fecha_inicio_mantto,fecha_final_mantto,fecha_salida,responsable_salida,condicion,archivo_url,created_at").order("created_at", { ascending: false }).then(({ data, error }) => { if (error) { console.error("Taller error:", JSON.stringify(error)); setLoading(false); return; } setItems(data || []); setLoading(false); });
   }, []);
 
   const save = async () => {
@@ -2354,7 +2354,7 @@ function TallerPage() {
       await supabase.from("taller").update(payload).eq("id", editId);
       setItems(p => p.map(x => x.id === editId ? { ...x, ...payload } : x));
     } else {
-      const { data, error } = await supabase.from("taller").insert(payload).select("id,tipo_bomba,propiedad,serie,tag,avance_inspeccion,avance_reparacion,comentario,fecha_inicio_inspeccion,fecha_final_inspeccion,fecha_inicio_mantto,fecha_final_mantto,fecha_salida,responsable_salida,condicion,archivo_url,created_at");
+      const { data, error } = await supabase.from("taller").insert(payload).select("id,tipo_bomba,propiedad,ubicacion_actual,serie,tag,avance_inspeccion,avance_reparacion,comentario,fecha_inicio_inspeccion,fecha_final_inspeccion,fecha_inicio_mantto,fecha_final_mantto,fecha_salida,responsable_salida,condicion,archivo_url,created_at");
       if (error) { console.error("Insert error:", error); return; }
       if (data && data[0]) setItems(p => [data[0], ...p]);
     }
