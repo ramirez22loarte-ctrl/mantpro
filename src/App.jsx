@@ -160,6 +160,8 @@ const ALL_MODULOS = [
   { k: "solped", l: "SOLPED y Repuestos" },
   { k: "avisos", l: "Seguimiento Avisos" },
   { k: "taller", l: "Taller" },
+  { k: "megado", l: "Megado · Ingreso" },
+  { k: "megado_hist", l: "Megado · Historial" },
   { k: "users", l: "Usuarios" },
 ];
 
@@ -2505,6 +2507,328 @@ function TallerPage() {
     </div>
   );
 }
+// ── MEGADO · INGRESO Y HISTORIAL ─────────────────────────────
+// Pegar justo ANTES de:  export default function App() {
+const MEGADO_COLS = "id,tag,marca_modelo,fecha,tension_v,corriente_a,serial,instrumento,supervisor,tecnico,f1_f2,f1_f3,f2_f3,f1_t,f2_t,f3_t,tiempo_fases_min,r_30s,r_1min,r_10min,pi,dar,voltaje_v,tiempo_prueba_min,comentario,created_at";
+const megadoNum = (v) => {
+  if (v === "" || v === null || v === undefined) return null;
+  const n = parseFloat(String(v).replace(",", "."));
+  return isNaN(n) ? null : n;
+};
+const megadoToday = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+const megadoFecha = (d) => (d ? d.split("-").reverse().join("/") : "—");
+const megadoVal = (v) => (v === null || v === undefined ? "—" : Number(v).toString());
+
+function MegadoPage({ equipment }) {
+  const emptyForm = () => ({
+    tag: "", marca_modelo: "", fecha: megadoToday(), tension_v: "", corriente_a: "", serial: "", instrumento: "", supervisor: "", tecnico: "",
+    f1_f2: "", f1_f3: "", f2_f3: "", f1_t: "", f2_t: "", f3_t: "", tiempo_fases_min: "",
+    r_30s: "", r_1min: "", r_10min: "", pi: "", dar: "", voltaje_v: "", tiempo_prueba_min: "",
+    comentario: "",
+  });
+  const [f, setF] = useState(emptyForm);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const s = (k, v) => { setF(p => ({ ...p, [k]: v })); setMsg(null); };
+
+  const tags = useMemo(() => [...new Set(equipment.map(e => e.code).filter(Boolean))].sort(), [equipment]);
+
+  const r30 = megadoNum(f.r_30s), r1 = megadoNum(f.r_1min), r10 = megadoNum(f.r_10min);
+  const autoDAR = r30 && r1 ? r1 / r30 : null;
+  const autoPI = r1 && r10 ? r10 / r1 : null;
+  const piShown = f.pi !== "" ? f.pi : (autoPI !== null ? autoPI.toFixed(2) : "");
+  const darShown = f.dar !== "" ? f.dar : (autoDAR !== null ? autoDAR.toFixed(2) : "");
+
+  const hasData = Object.entries(f).some(([k, v]) => k !== "fecha" && String(v).trim() !== "");
+
+  const save = async () => {
+    setSaving(true); setMsg(null);
+    const txt = (v) => (v && v.trim() ? v.trim() : null);
+    const payload = {
+      tag: f.tag || null, marca_modelo: txt(f.marca_modelo), fecha: f.fecha || null,
+      tension_v: megadoNum(f.tension_v), corriente_a: megadoNum(f.corriente_a),
+      serial: txt(f.serial), instrumento: txt(f.instrumento), supervisor: txt(f.supervisor), tecnico: txt(f.tecnico),
+      f1_f2: megadoNum(f.f1_f2), f1_f3: megadoNum(f.f1_f3), f2_f3: megadoNum(f.f2_f3),
+      f1_t: megadoNum(f.f1_t), f2_t: megadoNum(f.f2_t), f3_t: megadoNum(f.f3_t),
+      tiempo_fases_min: megadoNum(f.tiempo_fases_min),
+      r_30s: r30, r_1min: r1, r_10min: r10,
+      pi: f.pi !== "" ? megadoNum(f.pi) : (autoPI !== null ? Number(autoPI.toFixed(3)) : null),
+      dar: f.dar !== "" ? megadoNum(f.dar) : (autoDAR !== null ? Number(autoDAR.toFixed(3)) : null),
+      voltaje_v: megadoNum(f.voltaje_v), tiempo_prueba_min: megadoNum(f.tiempo_prueba_min),
+      comentario: txt(f.comentario),
+    };
+    const { error } = await supabase.from("megado_registros").insert(payload);
+    setSaving(false);
+    if (error) {
+      console.error("Megado insert error:", error);
+      setMsg({ ok: false, t: "No se pudo guardar: " + (error.message || "error desconocido") });
+      return;
+    }
+    setF(emptyForm());
+    setMsg({ ok: true, t: "✅ Registro guardado. Puedes verlo en Megado · Historial." });
+  };
+
+  const txtF = (l, k, ph) => (
+    <Lbl l={l}><input className="inp" value={f[k]} onChange={e => s(k, e.target.value)} placeholder={ph || ""} /></Lbl>
+  );
+  const numF = (l, k) => (
+    <Lbl l={l}><input className="inp" type="number" step="any" value={f[k]} onChange={e => s(k, e.target.value)} /></Lbl>
+  );
+  const grid = { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 10 };
+  const title = { fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 13, color: "#f1f5f9", marginBottom: 12 };
+
+  return (
+    <div className="fd" style={{ maxWidth: 900 }}>
+      <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 15, color: "#f1f5f9", marginBottom: 16 }}>🔌 Megado · Ingreso de parámetros</div>
+
+      <div className="card" style={{ marginBottom: 14 }}>
+        <div style={title}>Encabezado</div>
+        <div style={grid}>
+          {txtF("Marca / Modelo", "marca_modelo")}
+          <Lbl l="Fecha"><input className="inp" type="date" value={f.fecha} onChange={e => s("fecha", e.target.value)} /></Lbl>
+          {numF("Tensión (V)", "tension_v")}
+          {numF("Corriente (A)", "corriente_a")}
+          <Lbl l="TAG">
+            <select className="inp" value={f.tag} onChange={e => s("tag", e.target.value)}>
+              <option value="">— Seleccionar TAG —</option>
+              {tags.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </Lbl>
+          {txtF("Serial N°", "serial")}
+          {txtF("Instrumento", "instrumento")}
+          {txtF("Supervisor", "supervisor")}
+          {txtF("Técnico", "tecnico")}
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 14 }}>
+        <div style={title}>Aislamiento entre fases y a tierra</div>
+        <div style={grid}>
+          {numF("F1 y F2 (GΩ)", "f1_f2")}
+          {numF("F1 y F3 (GΩ)", "f1_f3")}
+          {numF("F2 y F3 (GΩ)", "f2_f3")}
+          {numF("F1 y T (GΩ)", "f1_t")}
+          {numF("F2 y T (GΩ)", "f2_t")}
+          {numF("F3 y T (GΩ)", "f3_t")}
+          {numF("Tiempo (min)", "tiempo_fases_min")}
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 14 }}>
+        <div style={title}>Prueba de tiempo</div>
+        <div style={grid}>
+          {numF("30 s (GΩ)", "r_30s")}
+          {numF("1 min (GΩ)", "r_1min")}
+          {numF("10 min (GΩ)", "r_10min")}
+          <Lbl l="PI (R10 min / R1 min)">
+            <input className="inp" type="number" step="any" value={piShown} onChange={e => s("pi", e.target.value)} placeholder="Automático" />
+          </Lbl>
+          <Lbl l="DAR (R1 min / R30 s)">
+            <input className="inp" type="number" step="any" value={darShown} onChange={e => s("dar", e.target.value)} placeholder="Automático" />
+          </Lbl>
+          {numF("Voltaje (V)", "voltaje_v")}
+          {numF("Tiempo (min)", "tiempo_prueba_min")}
+        </div>
+        <div style={{ fontSize: 11, color: "#475569", marginTop: 8 }}>PI y DAR se calculan solos con las lecturas; si escribes un valor, se guarda el tuyo.</div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 14 }}>
+        <Lbl l="Comentario">
+          <textarea className="inp" rows={3} value={f.comentario} onChange={e => s("comentario", e.target.value)} style={{ resize: "vertical" }} placeholder="Observaciones de la prueba" />
+        </Lbl>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <button className="btn" onClick={save} disabled={saving || !hasData} style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "9px 22px", fontSize: 13 }}>
+          {saving ? "Guardando..." : "Guardar registro"}
+        </button>
+        <button className="btn" onClick={() => { setF(emptyForm()); setMsg(null); }} disabled={saving} style={{ background: "#111c30", color: "#64748b", padding: "9px 16px", fontSize: 13 }}>Limpiar</button>
+        {msg && <span style={{ fontSize: 12.5, color: msg.ok ? "#34d399" : "#f87171" }}>{msg.t}</span>}
+      </div>
+    </div>
+  );
+}
+
+function MegadoHistorialPage({ equipment }) {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [fTag, setFTag] = useState("");
+  const [fDesde, setFDesde] = useState("");
+  const [fHasta, setFHasta] = useState("");
+
+  useEffect(() => {
+    supabase.from("megado_registros").select(MEGADO_COLS)
+      .order("fecha", { ascending: false }).order("created_at", { ascending: false }).limit(5000)
+      .then(({ data, error }) => {
+        if (error) console.error("Megado historial error:", JSON.stringify(error));
+        setRows(data || []);
+        setLoading(false);
+      });
+  }, []);
+
+  const tags = useMemo(() => [...new Set(rows.map(r => r.tag).filter(Boolean))].sort(), [rows]);
+
+  const filtered = useMemo(() => rows.filter(r =>
+    (!fTag || r.tag === fTag) &&
+    (!fDesde || (r.fecha && r.fecha >= fDesde)) &&
+    (!fHasta || (r.fecha && r.fecha <= fHasta))
+  ), [rows, fTag, fDesde, fHasta]);
+
+  const chartData = useMemo(() => [...filtered]
+    .sort((a, b) => ((a.fecha || "") + a.created_at).localeCompare((b.fecha || "") + b.created_at))
+    .map(r => ({
+      fecha: megadoFecha(r.fecha),
+      "F1-T": r.f1_t, "F2-T": r.f2_t, "F3-T": r.f3_t,
+      "F1-F2": r.f1_f2, "F1-F3": r.f1_f3, "F2-F3": r.f2_f3,
+      PI: r.pi, DAR: r.dar,
+    })), [filtered]);
+
+  const del = async (id) => {
+    if (!window.confirm("¿Eliminar este registro de megado?")) return;
+    const { error } = await supabase.from("megado_registros").delete().eq("id", id);
+    if (error) { console.error("Megado delete error:", error); return; }
+    setRows(p => p.filter(x => x.id !== id));
+  };
+
+  const exportExcel = () => {
+    const XLSX = window.XLSX;
+    if (!XLSX) return;
+    const ws = XLSX.utils.json_to_sheet(filtered.map(r => ({
+      "TAG": r.tag, "Fecha": r.fecha, "Marca / Modelo": r.marca_modelo, "Tensión (V)": r.tension_v, "Corriente (A)": r.corriente_a,
+      "Serial N°": r.serial, "Instrumento": r.instrumento, "Supervisor": r.supervisor, "Técnico": r.tecnico,
+      "F1-F2 (GΩ)": r.f1_f2, "F1-F3 (GΩ)": r.f1_f3, "F2-F3 (GΩ)": r.f2_f3,
+      "F1-T (GΩ)": r.f1_t, "F2-T (GΩ)": r.f2_t, "F3-T (GΩ)": r.f3_t, "Tiempo fases (min)": r.tiempo_fases_min,
+      "30 s (GΩ)": r.r_30s, "1 min (GΩ)": r.r_1min, "10 min (GΩ)": r.r_10min, "PI": r.pi, "DAR": r.dar,
+      "Voltaje (V)": r.voltaje_v, "Tiempo prueba (min)": r.tiempo_prueba_min, "Comentario": r.comentario,
+    })));
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Megado");
+    XLSX.writeFile(wb, "megado_historial.xlsx");
+  };
+
+  const lastPI = filtered.find(r => r.pi !== null && r.pi !== undefined);
+  const kpis = [
+    { l: "Registros", v: filtered.length, c: "#60a5fa" },
+    { l: "Equipos", v: new Set(filtered.map(r => r.tag).filter(Boolean)).size, c: "#34d399" },
+    { l: "Último megado", v: filtered.length ? megadoFecha(filtered[0].fecha) : "—", c: "#facc15" },
+    { l: "Último PI", v: lastPI ? megadoVal(lastPI.pi) : "—", c: "#a78bfa" },
+  ];
+
+  const ttip = { background: "#0b1629", border: "1px solid #1a2740", borderRadius: 8, fontSize: 11, color: "#e2e8f0" };
+  const mchart = (titulo, unidad, series) => (
+    <div className="card" key={titulo}>
+      <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 12, color: "#f1f5f9", marginBottom: 2 }}>{titulo}</div>
+      <div style={{ fontSize: 10, color: "#475569", marginBottom: 8 }}>{unidad}</div>
+      <ResponsiveContainer width="100%" height={200}>
+        <LineChart data={chartData}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#111c30" />
+          <XAxis dataKey="fecha" stroke="#334155" fontSize={9} tick={{ fill: "#475569" }} />
+          <YAxis stroke="#334155" fontSize={9} tick={{ fill: "#475569" }} width={40} />
+          <Tooltip contentStyle={ttip} />
+          <Legend wrapperStyle={{ fontSize: 11 }} />
+          {series.map(([k, c]) => <Line key={k} type="monotone" dataKey={k} stroke={c} strokeWidth={2} dot={{ fill: c, r: 3 }} connectNulls />)}
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+
+  const cell = (l, v) => (
+    <div key={l}>
+      <div style={{ fontSize: 10, color: "#334155", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 2 }}>{l}</div>
+      <div style={{ fontSize: 13, color: "#cbd5e1", wordBreak: "break-word" }}>{v === null || v === undefined || v === "" ? "—" : v}</div>
+    </div>
+  );
+  const g = { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12 };
+
+  return (
+    <div className="fd">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
+        <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 15, color: "#f1f5f9" }}>📉 Megado · Historial</div>
+        <button className="btn" onClick={exportExcel} disabled={!filtered.length} style={{ background: "#0f2040", color: "#34d399", padding: "7px 14px", fontSize: 13 }}>📊 Exportar Excel</button>
+      </div>
+
+      <div className="card" style={{ marginBottom: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 10, alignItems: "end" }}>
+          <Lbl l="TAG">
+            <select className="inp" value={fTag} onChange={e => setFTag(e.target.value)}>
+              <option value="">Todos los TAG</option>
+              {tags.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </Lbl>
+          <Lbl l="Desde"><input className="inp" type="date" value={fDesde} onChange={e => setFDesde(e.target.value)} /></Lbl>
+          <Lbl l="Hasta"><input className="inp" type="date" value={fHasta} onChange={e => setFHasta(e.target.value)} /></Lbl>
+          <button className="btn" onClick={() => { setFTag(""); setFDesde(""); setFHasta(""); }} style={{ background: "#111c30", color: "#64748b", padding: "9px 14px", fontSize: 13 }}>Limpiar filtros</button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div style={{ display: "flex", justifyContent: "center", padding: 40 }}><Spinner /></div>
+      ) : (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 10, marginBottom: 14 }}>
+            {kpis.map(k => (
+              <div key={k.l} className="card">
+                <div style={{ fontSize: 10, color: "#475569", marginBottom: 4 }}>{k.l}</div>
+                <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 800, fontSize: 22, color: k.c }}>{k.v}</div>
+              </div>
+            ))}
+          </div>
+
+          {fTag ? (
+            filtered.length > 0 && (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(380px,1fr))", gap: 12, marginBottom: 14 }}>
+                {mchart("Aislamiento fase a tierra", "GΩ", [["F1-T", "#60a5fa"], ["F2-T", "#34d399"], ["F3-T", "#facc15"]])}
+                {mchart("Aislamiento entre fases", "GΩ", [["F1-F2", "#f97316"], ["F1-F3", "#22d3ee"], ["F2-F3", "#a78bfa"]])}
+                {mchart("Índices PI y DAR", "adimensional", [["PI", "#34d399"], ["DAR", "#f472b6"]])}
+              </div>
+            )
+          ) : (
+            <div className="card" style={{ marginBottom: 14, textAlign: "center", color: "#475569", fontSize: 12.5 }}>Selecciona un TAG para ver los gráficos de tendencia.</div>
+          )}
+
+          {filtered.length === 0 ? (
+            <div className="card" style={{ textAlign: "center", color: "#475569", padding: 30 }}>No hay registros de megado con estos filtros.</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {filtered.map(r => (
+                <div key={r.id} className="card">
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <span style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 14, color: "#60a5fa" }}>{r.tag || "Sin TAG"}</span>
+                      <span style={{ fontSize: 12, color: "#64748b" }}>{megadoFecha(r.fecha)}</span>
+                    </div>
+                    <button className="btn" onClick={() => del(r.id)} style={{ background: "#111c30", color: "#f87171", padding: "4px 10px", fontSize: 12 }}>🗑</button>
+                  </div>
+                  <div style={{ ...g, marginBottom: 12 }}>
+                    {cell("Marca / Modelo", r.marca_modelo)}{cell("Tensión (V)", megadoVal(r.tension_v))}{cell("Corriente (A)", megadoVal(r.corriente_a))}
+                    {cell("Serial N°", r.serial)}{cell("Instrumento", r.instrumento)}{cell("Supervisor", r.supervisor)}{cell("Técnico", r.tecnico)}
+                  </div>
+                  <div style={{ ...g, paddingTop: 12, borderTop: "1px solid #14213a", marginBottom: 12 }}>
+                    {cell("F1-F2 (GΩ)", megadoVal(r.f1_f2))}{cell("F1-F3 (GΩ)", megadoVal(r.f1_f3))}{cell("F2-F3 (GΩ)", megadoVal(r.f2_f3))}
+                    {cell("F1-T (GΩ)", megadoVal(r.f1_t))}{cell("F2-T (GΩ)", megadoVal(r.f2_t))}{cell("F3-T (GΩ)", megadoVal(r.f3_t))}
+                    {cell("Tiempo (min)", megadoVal(r.tiempo_fases_min))}
+                  </div>
+                  <div style={{ ...g, paddingTop: 12, borderTop: "1px solid #14213a" }}>
+                    {cell("30 s (GΩ)", megadoVal(r.r_30s))}{cell("1 min (GΩ)", megadoVal(r.r_1min))}{cell("10 min (GΩ)", megadoVal(r.r_10min))}
+                    {cell("PI", megadoVal(r.pi))}{cell("DAR", megadoVal(r.dar))}{cell("Voltaje (V)", megadoVal(r.voltaje_v))}{cell("Tiempo (min)", megadoVal(r.tiempo_prueba_min))}
+                  </div>
+                  {r.comentario && (
+                    <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #14213a" }}>
+                      {cell("Comentario", r.comentario)}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [locations, setLocations] = useState([]);
@@ -2582,6 +2906,8 @@ export default function App() {
     { k: "solped", i: "🔧", l: "SOLPED y Repuestos" },
     { k: "avisos", i: "🔔", l: "Seguimiento Avisos" },
     { k: "taller", i: "🔩", l: "Taller" },
+    { k: "megado", i: "🔌", l: "Megado · Ingreso" },
+    { k: "megado_hist", i: "📉", l: "Megado · Historial" },
     { k: "users", i: "👥", l: "Usuarios" },
   ];
   const TECH_NAV = [
@@ -2848,6 +3174,8 @@ export default function App() {
           {page === "solped" && isAdmin && <SolpedPage />}
           {page === "avisos" && isAdmin && <AvisosPage />}
           {page === "taller" && isAdmin && <TallerPage />}
+          {page === "megado" && isAdmin && <MegadoPage equipment={equipment} />}
+          {page === "megado_hist" && isAdmin && <MegadoHistorialPage equipment={equipment} />}
 
           {page === "verificacion" && isAdmin && (() => {
             // Group readings by OT
