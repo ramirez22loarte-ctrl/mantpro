@@ -2652,7 +2652,7 @@ function MegadoPage({ equipment }) {
   );
 }
 
-function MegadoHistorialPage({ equipment }) {
+function MegadoHistorialPage({ equipment, canDelete }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [fTag, setFTag] = useState("");
@@ -2687,6 +2687,7 @@ function MegadoHistorialPage({ equipment }) {
     })), [filtered]);
 
   const del = async (id) => {
+    if (!canDelete) return;
     if (!window.confirm("¿Eliminar este registro de megado?")) return;
     const { error } = await supabase.from("megado_registros").delete().eq("id", id);
     if (error) { console.error("Megado delete error:", error); return; }
@@ -2799,7 +2800,7 @@ function MegadoHistorialPage({ equipment }) {
                       <span style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 14, color: "#60a5fa" }}>{r.tag || "Sin TAG"}</span>
                       <span style={{ fontSize: 12, color: "#64748b" }}>{megadoFecha(r.fecha)}</span>
                     </div>
-                    <button className="btn" onClick={() => del(r.id)} style={{ background: "#111c30", color: "#f87171", padding: "4px 10px", fontSize: 12 }}>🗑</button>
+                    {canDelete && <button className="btn" onClick={() => del(r.id)} style={{ background: "#111c30", color: "#f87171", padding: "4px 10px", fontSize: 12 }}>🗑</button>}
                   </div>
                   <div style={{ ...g, marginBottom: 12 }}>
                     {cell("Marca / Modelo", r.marca_modelo)}{cell("Tensión (V)", megadoVal(r.tension_v))}{cell("Corriente (A)", megadoVal(r.corriente_a))}
@@ -3175,7 +3176,7 @@ export default function App() {
           {page === "avisos" && isAdmin && <AvisosPage />}
           {page === "taller" && isAdmin && <TallerPage />}
           {page === "megado" && isAdmin && <MegadoPage equipment={equipment} />}
-          {page === "megado_hist" && isAdmin && <MegadoHistorialPage equipment={equipment} />}
+          {page === "megado_hist" && isAdmin && <MegadoHistorialPage equipment={equipment} canDelete={!!user.full_access} />}
 
           {page === "verificacion" && isAdmin && (() => {
             // Group readings by OT
