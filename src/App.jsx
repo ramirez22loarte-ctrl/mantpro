@@ -63,7 +63,7 @@ body{background:#060b14;color:#e2e8f0;font-family:'DM Sans',sans-serif}
 input,textarea,select{outline:none;font-family:'DM Sans',sans-serif;color:#e2e8f0}
 .btn{cursor:pointer;border:none;border-radius:7px;font-family:'DM Sans',sans-serif;font-weight:500;transition:all .15s}
 .btn:hover{filter:brightness(1.12)}.btn:disabled{opacity:.4;cursor:not-allowed}
-.nav{cursor:pointer;padding:7px 11px;border-radius:7px;transition:all .15s;display:flex;align-items:center;gap:9px;font-size:13px;color:#64748b;white-space:nowrap}
+.nav{cursor:pointer;padding:7px 11px;border-radius:7px;transition:all .15s;display:flex;align-items:center;gap:9px;font-size:13px;font-weight:600;color:#cbd5e1;white-space:nowrap}
 .nav:hover{background:#111c30;color:#cbd5e1}.nav.on{background:#0f2040;color:#60a5fa;font-weight:600}
 .inp{background:#07111f;border:1px solid #1a2740;border-radius:7px;padding:9px 12px;font-size:13.5px;width:100%;transition:border .15s}
 .inp:focus{border-color:#3b82f6}
@@ -75,14 +75,14 @@ input,textarea,select{outline:none;font-family:'DM Sans',sans-serif;color:#e2e8f
 .mod{background:#0b1629;border:1px solid #1a2740;border-radius:14px;width:720px;max-width:96vw;max-height:92vh;overflow-y:auto;padding:26px}
 .fd{animation:fd .25s ease}@keyframes fd{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 .ptable{width:100%;border-collapse:collapse;font-size:12.5px}
-.ptable th{padding:8px 10px;text-align:left;color:#475569;font-weight:600;border-bottom:1px solid #14213a;font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+.ptable th{padding:8px 10px;text-align:left;color:#cbd5e1;font-weight:600;border-bottom:1px solid #14213a;font-size:11px;text-transform:uppercase;letter-spacing:.05em}
 .ptable td{padding:7px 10px;border-bottom:1px solid #0a1120;vertical-align:middle}
 .spin{width:18px;height:18px;border:2px solid #1e293b;border-top-color:#3b82f6;border-radius:50%;animation:sp .7s linear infinite;display:inline-block}
 @keyframes sp{to{transform:rotate(360deg)}}
 `;
 
 function Lbl({ l, children }) {
-  return <div><div style={{ fontSize: 10, color: "#334155", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.07em" }}>{l}</div>{children}</div>;
+  return <div><div style={{ fontSize: 10, color: "#cbd5e1", fontWeight: 600, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.07em" }}>{l}</div>{children}</div>;
 }
 function STag({ status }) {
   const sc = S_COLOR[status] || S_COLOR["Abierta"];
@@ -198,7 +198,7 @@ function NewUser({ onClose, onSave, currentUser }) {
       <div className="mod fd" style={{ width: 460 }}>
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 18 }}>
           <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 16, color: "#f1f5f9" }}>👤 Nuevo Usuario</div>
-          <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "5px 11px" }}>✕</button>
+          <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#cbd5e1", padding: "5px 11px", fontWeight: 600}}>✕</button>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
           <Lbl l="Nombre completo *"><input className="inp" placeholder="Juan Pérez" value={f.name} onChange={e => s("name", e.target.value)} /></Lbl>
@@ -222,7 +222,7 @@ function NewUser({ onClose, onSave, currentUser }) {
               {!f.full_access && (
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
                   {availableModulos.map(m => (
-                    <label key={m.k} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, color: f.modulos.includes(m.k) ? "#60a5fa" : "#64748b" }}>
+                    <label key={m.k} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, color: f.modulos.includes(m.k) ? "#60a5fa" : "#cbd5e1", fontWeight: 600}}>
                       <input type="checkbox" checked={f.modulos.includes(m.k)} onChange={() => toggleModulo(m.k)} />
                       {m.l}
                     </label>
@@ -234,7 +234,7 @@ function NewUser({ onClose, onSave, currentUser }) {
           )}
           {err && <div style={{ fontSize: 12, color: "#f87171", background: "#3b0f0f", padding: "8px 12px", borderRadius: 7 }}>{err}</div>}
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 }}>
-            <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "8px 16px", fontSize: 13 }}>Cancelar</button>
+            <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#cbd5e1", padding: "8px 16px", fontSize: 13, fontWeight: 600}}>Cancelar</button>
             <button className="btn" onClick={submit} disabled={saving} style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "8px 20px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
               {saving ? "Creando..." : "Crear Usuario"}
             </button>
@@ -393,7 +393,7 @@ function ExcelImport({ onClose, onImported }) {
       <div className="mod fd" style={{ width: 700 }}>
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 18 }}>
           <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 16, color: "#f1f5f9" }}>📥 Importar OTs desde Excel</div>
-          <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "5px 11px" }}>✕</button>
+          <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#cbd5e1", padding: "5px 11px", fontWeight: 600}}>✕</button>
         </div>
 
         {/* Upload area */}
@@ -406,20 +406,20 @@ function ExcelImport({ onClose, onImported }) {
           onMouseLeave={e => e.currentTarget.style.borderColor = "#1a2740"}
         >
           <div style={{ fontSize: 32, marginBottom: 8 }}>📊</div>
-          <div style={{ fontSize: 14, color: "#64748b" }}>
+          <div style={{ fontSize: 14, color: "#cbd5e1", fontWeight: 600}}>
             {file ? <span style={{ color: "#34d399", fontWeight: 600 }}>{file.name}</span> : "Arrastra tu Excel aquí o haz clic para seleccionar"}
           </div>
-          <div style={{ fontSize: 11, color: "#334155", marginTop: 4 }}>Soporta .xlsx y .xls</div>
+          <div style={{ fontSize: 11, color: "#cbd5e1", marginTop: 4, fontWeight: 600}}>Soporta .xlsx y .xls</div>
           <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: "none" }}
             onChange={e => { const f = e.target.files[0]; if (f) handleFile(f); }} />
         </div>
 
-        {loading && <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, color: "#64748b", fontSize: 13 }}><Spinner /> {status}</div>}
+        {loading && <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, color: "#cbd5e1", fontSize: 13, fontWeight: 600}}><Spinner /> {status}</div>}
         {!loading && status && <div style={{ fontSize: 13, color: done ? "#34d399" : "#60a5fa", marginBottom: 12, padding: "8px 12px", background: "#060b14", borderRadius: 7 }}>{status}</div>}
 
         {preview.length > 0 && !done && (
           <div>
-            <div style={{ fontSize: 12, color: "#475569", marginBottom: 8 }}>Vista previa — primeras {Math.min(preview.length, 10)} OTs:</div>
+            <div style={{ fontSize: 12, color: "#cbd5e1", marginBottom: 8, fontWeight: 600}}>Vista previa — primeras {Math.min(preview.length, 10)} OTs:</div>
             <div style={{ overflowX: "auto", marginBottom: 14 }}>
               <table className="ptable">
                 <thead><tr>{["N° OT","Disciplina","Tag Equipo","Descripción"].map(h => <th key={h}>{h}</th>)}</tr></thead>
@@ -428,7 +428,7 @@ function ExcelImport({ onClose, onImported }) {
                     <tr key={i}>
                       <td style={{ color: "#3b82f6", fontFamily: "Syne,sans-serif", fontSize: 11, fontWeight: 700 }}>{r.otNum}</td>
                       <td><span style={{ color: D_COLOR[r.disc] }}>{D_ICON[r.disc]} {r.disc}</span></td>
-                      <td style={{ color: "#64748b", fontSize: 11 }}>{r.tag?.slice(0, 30)}</td>
+                      <td style={{ color: "#cbd5e1", fontSize: 11, fontWeight: 600}}>{r.tag?.slice(0, 30)}</td>
                       <td style={{ color: "#94a3b8", fontSize: 11 }}>{r.desc?.slice(0, 50)}</td>
                     </tr>
                   ))}
@@ -436,7 +436,7 @@ function ExcelImport({ onClose, onImported }) {
               </table>
             </div>
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "8px 16px", fontSize: 13 }}>Cancelar</button>
+              <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#cbd5e1", padding: "8px 16px", fontSize: 13, fontWeight: 600}}>Cancelar</button>
               <button className="btn" onClick={importOTs} style={{ background: "linear-gradient(135deg,#065f46,#0f766e)", color: "#34d399", padding: "8px 20px", fontSize: 13 }}>
                 ⬆️ Importar {preview.length} OTs
               </button>
@@ -492,12 +492,12 @@ function TechOTSearch({ user, onFound, onClose }) {
           <div style={{ textAlign: "center", flex: 1 }}>
             <div style={{ fontSize: 32, marginBottom: 6 }}>🔍</div>
             <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 17, color: "#f1f5f9" }}>Buscar Orden de Trabajo</div>
-            <div style={{ fontSize: 12, color: "#475569", marginTop: 4 }}>Ingresa el número de tu OT</div>
-          <div style={{ fontSize: 11, color: D_COLOR[user.discipline] || "#64748b", marginTop: 6, fontWeight: 600 }}>
+            <div style={{ fontSize: 12, color: "#cbd5e1", marginTop: 4, fontWeight: 600}}>Ingresa el número de tu OT</div>
+          <div style={{ fontSize: 11, color: D_COLOR[user.discipline] || "#cbd5e1", marginTop: 6, fontWeight: 600 }}>
             {D_ICON[user.discipline]} Buscando en: {user.discipline}
           </div>
           </div>
-          <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "5px 11px", alignSelf: "flex-start" }}>✕</button>
+          <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#cbd5e1", padding: "5px 11px", alignSelf: "flex-start", fontWeight: 600}}>✕</button>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
           <Lbl l="N° Orden de Trabajo">
@@ -573,7 +573,7 @@ function OTRow({ ot, equipment, onClick, onDelete }) {
           <span style={{ fontSize: 10, color: P_COLOR[ot.priority] }}>● {ot.priority}</span>
         </div>
         <div style={{ fontSize: 13.5, fontWeight: 600, color: "#f1f5f9", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ot.title}</div>
-        <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>{eq?.name || "—"} · Vence: {ot.due_date || "—"}</div>
+        <div style={{ fontSize: 11, color: "#cbd5e1", marginTop: 2, fontWeight: 600}}>{eq?.name || "—"} · Vence: {ot.due_date || "—"}</div>
       </div>
       <div style={{ fontSize: 20, flexShrink: 0 }}>{D_ICON[ot.discipline]}</div>
       {onDelete && (
@@ -760,7 +760,7 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
               <span className="tag" style={{ background: "#111c30", color: D_COLOR[ot.discipline] }}>{D_ICON[ot.discipline]} {ot.discipline}</span>
             </div>
             <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 15, color: "#f1f5f9" }}>{ot.title}</div>
-            <div style={{ fontSize: 11, color: "#475569", marginTop: 3 }}>{ot.id} · {eq?.name}</div>
+            <div style={{ fontSize: 11, color: "#cbd5e1", marginTop: 3, fontWeight: 600}}>{ot.id} · {eq?.name}</div>
           </div>
           <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
             {status !== "Cerrada" ? (
@@ -774,14 +774,14 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
                 📄 PDF
               </button>
             )}
-            <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "5px 12px" }}>✕</button>
+            <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#cbd5e1", padding: "5px 12px", fontWeight: 600}}>✕</button>
           </div>
         </div>
 
         <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "1px solid #14213a", paddingBottom: 10, flexWrap: "wrap" }}>
           {TABS.map(t => (
             <button key={t.k} className="btn" onClick={() => switchTab(t.k)}
-              style={{ padding: "5px 13px", fontSize: 12, background: tab === t.k ? "#0f2040" : "transparent", color: tab === t.k ? "#60a5fa" : "#475569", border: `1px solid ${tab === t.k ? "#1d4ed8" : "transparent"}` }}>
+              style={{ padding: "5px 13px", fontSize: 12, background: tab === t.k ? "#0f2040" : "transparent", color: tab === t.k ? "#60a5fa" : "#cbd5e1", border: `1px solid ${tab === t.k ? "#1d4ed8" : "transparent"}`, fontWeight: 600}}>
               {t.l}
             </button>
           ))}
@@ -793,7 +793,7 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
               <div style={{ textAlign: "center", padding: "40px 20px" }}>
                 <div style={{ fontSize: 40, marginBottom: 16 }}>✅</div>
                 <div style={{ fontFamily: "Syne,sans-serif", fontSize: 18, fontWeight: 700, color: "#a78bfa", marginBottom: 8 }}>Orden de Trabajo Cerrada</div>
-                <div style={{ fontSize: 13, color: "#475569" }}>Esta OT fue cerrada. Los datos ya fueron registrados.</div>
+                <div style={{ fontSize: 13, color: "#cbd5e1", fontWeight: 600}}>Esta OT fue cerrada. Los datos ya fueron registrados.</div>
               </div>
             ) : (
             <div>
@@ -811,7 +811,7 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
                     🗑️ Limpiar lecturas
                   </button>
                 )}
-                <div style={{ fontSize: 11, color: "#334155", fontStyle: "italic" }}>
+                <div style={{ fontSize: 11, color: "#cbd5e1", fontStyle: "italic", fontWeight: 600}}>
                   💡 Se guarda automáticamente al cambiar de pestaña
                 </div>
               </div>
@@ -820,13 +820,13 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: "#060b14" }}>
-                    <th style={{ padding: "10px 14px", textAlign: "left", color: "#475569", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: "2px solid #1a2740", width: "40%" }}>
+                    <th style={{ padding: "10px 14px", textAlign: "left", color: "#cbd5e1", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: "2px solid #1a2740", width: "40%" }}>
                       Parámetro
                     </th>
-                    <th style={{ padding: "10px 14px", textAlign: "left", color: "#475569", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: "2px solid #1a2740", width: "20%" }}>
+                    <th style={{ padding: "10px 14px", textAlign: "left", color: "#cbd5e1", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: "2px solid #1a2740", width: "20%" }}>
                       Última lectura
                     </th>
-                    <th style={{ padding: "10px 14px", textAlign: "left", color: "#475569", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: "2px solid #1a2740", width: "40%" }}>
+                    <th style={{ padding: "10px 14px", textAlign: "left", color: "#cbd5e1", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: "2px solid #1a2740", width: "40%" }}>
                       Ingresar Información
                     </th>
                   </tr>
@@ -838,7 +838,7 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
                       <tr key={p.id} style={{ background: idx % 2 === 0 ? "#0b1629" : "#060b14", borderBottom: "1px solid #0f172a" }}>
                         <td style={{ padding: "11px 14px", color: "#f1f5f9", fontWeight: 500 }}>
                           {p.name}
-                          <span style={{ color: "#475569", fontSize: 11, marginLeft: 6 }}>({p.unit})</span>
+                          <span style={{ color: "#cbd5e1", fontSize: 11, marginLeft: 6, fontWeight: 600}}>({p.unit})</span>
                         </td>
                         <td style={{ padding: "11px 14px" }}>
                           {allReadingsForParam(p.id).length > 0 ? (
@@ -846,11 +846,11 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
                               {allReadingsForParam(p.id).map((r, ri) => (
                                 <div key={ri}>
                                   <span style={{ color: "#34d399", fontWeight: 700 }}>{r.value} {p.unit}</span>
-                                  <span style={{ color: "#334155", fontSize: 10, marginLeft: 5 }}>{new Date(r.created_at).toLocaleDateString("es-CO")}</span>
+                                  <span style={{ color: "#cbd5e1", fontSize: 10, marginLeft: 5, fontWeight: 600}}>{new Date(r.created_at).toLocaleDateString("es-CO")}</span>
                                 </div>
                               ))}
                             </div>
-                          ) : <span style={{ color: "#334155", fontSize: 11 }}>Sin datos</span>}
+                          ) : <span style={{ color: "#cbd5e1", fontSize: 11, fontWeight: 600}}>Sin datos</span>}
                         </td>
                         <td style={{ padding: "7px 14px" }}>
                           <input
@@ -875,14 +875,14 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
         {tab === "comments" && (
           <div>
             {comments.length === 0
-              ? <div style={{ color: "#334155", textAlign: "center", padding: 20, fontSize: 13 }}>Sin comentarios aún.</div>
+              ? <div style={{ color: "#cbd5e1", textAlign: "center", padding: 20, fontSize: 13, fontWeight: 600}}>Sin comentarios aún.</div>
               : <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
                 {comments.map(c => (
                   <div key={c.id} style={{ background: "#060b14", borderRadius: 8, padding: "10px 13px", borderLeft: `3px solid ${D_COLOR[c.discipline] || "#3b82f6"}`, position: "relative" }}>
                     <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 5, flexWrap: "wrap" }}>
                       <span style={{ fontSize: 13, fontWeight: 600, color: "#f1f5f9" }}>{c.author || "Técnico"}</span>
-                      <span style={{ fontSize: 10, color: "#475569" }}>{c.role || ""}{c.discipline ? " · " + c.discipline : ""}</span>
-                      <span style={{ fontSize: 10, color: "#334155", marginLeft: "auto" }}>{c.created_at ? new Date(c.created_at).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" }) : "—"}</span>
+                      <span style={{ fontSize: 10, color: "#cbd5e1", fontWeight: 600}}>{c.role || ""}{c.discipline ? " · " + c.discipline : ""}</span>
+                      <span style={{ fontSize: 10, color: "#cbd5e1", marginLeft: "auto", fontWeight: 600}}>{c.created_at ? new Date(c.created_at).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" }) : "—"}</span>
                       {isAdmin && (
                         <button className="btn" onClick={async () => {
                           if (!window.confirm("¿Eliminar este comentario?")) return;
@@ -897,13 +897,13 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
               </div>}
             <div style={{ borderTop: "1px solid #14213a", paddingTop: 12 }}>
               {(!isAdmin && status === "Cerrada") ? (
-                <div style={{ fontSize: 12, color: "#475569", fontStyle: "italic", padding: "10px 0" }}>Esta OT está cerrada. No se pueden agregar más comentarios.</div>
+                <div style={{ fontSize: 12, color: "#cbd5e1", fontStyle: "italic", padding: "10px 0", fontWeight: 600}}>Esta OT está cerrada. No se pueden agregar más comentarios.</div>
               ) : (
                 <>
                   <textarea className="inp" rows={3} placeholder="Escribe una novedad técnica... (se guarda al cambiar de pestaña o al Cerrar OT)" value={comment} onChange={e => setComment(e.target.value)} style={{ resize: "vertical", marginBottom: 8 }} />
                   <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                     <button className="btn" onClick={postComment} disabled={!comment.trim()} style={{ background: "#0f2040", color: "#60a5fa", padding: "7px 14px", fontSize: 12 }}>+ Agregar ahora</button>
-                    <div style={{ fontSize: 11, color: "#334155", fontStyle: "italic" }}>💡 También se guarda automáticamente al cerrar la OT</div>
+                    <div style={{ fontSize: 11, color: "#cbd5e1", fontStyle: "italic", fontWeight: 600}}>💡 También se guarda automáticamente al cerrar la OT</div>
                   </div>
                 </>
               )}
@@ -941,33 +941,33 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 <div style={{ background: "#060b14", borderRadius: 8, padding: "10px 14px" }}>
-                  <div style={{ fontSize: 10, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>TAG / Equipo</div>
+                  <div style={{ fontSize: 10, color: "#cbd5e1", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4, fontWeight: 600}}>TAG / Equipo</div>
                   <div style={{ fontSize: 15, fontWeight: 700, color: "#3b82f6", fontFamily: "Syne,sans-serif" }}>{infoTag || "—"}</div>
                 </div>
                 <div style={{ background: "#060b14", borderRadius: 8, padding: "10px 14px" }}>
-                  <div style={{ fontSize: 10, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Fecha Creación</div>
+                  <div style={{ fontSize: 10, color: "#cbd5e1", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4, fontWeight: 600}}>Fecha Creación</div>
                   <div style={{ fontSize: 13, fontWeight: 500, color: "#f1f5f9" }}>{ot.created_at || "—"}</div>
                 </div>
                 <div style={{ background: "#060b14", borderRadius: 8, padding: "10px 14px" }}>
-                  <div style={{ fontSize: 10, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Área</div>
+                  <div style={{ fontSize: 10, color: "#cbd5e1", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4, fontWeight: 600}}>Área</div>
                   <div style={{ fontSize: 13, fontWeight: 500, color: "#f1f5f9" }}>{infoArea}</div>
                 </div>
                 <div style={{ background: "#060b14", borderRadius: 8, padding: "10px 14px" }}>
-                  <div style={{ fontSize: 10, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Sub-Área</div>
+                  <div style={{ fontSize: 10, color: "#cbd5e1", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4, fontWeight: 600}}>Sub-Área</div>
                   <div style={{ fontSize: 13, fontWeight: 500, color: "#f1f5f9" }}>{infoSubarea}</div>
                 </div>
               </div>
               <div style={{ background: "#060b14", borderRadius: 8, padding: "12px 14px" }}>
-                <div style={{ fontSize: 10, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Descripción de Actividad</div>
+                <div style={{ fontSize: 10, color: "#cbd5e1", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6, fontWeight: 600}}>Descripción de Actividad</div>
                 <div style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.6 }}>{infoDesc}</div>
               </div>
               {isAdmin && (
                 <div style={{ background: "#060b14", borderRadius: 8, padding: "12px 14px" }}>
-                  <div style={{ fontSize: 11, color: "#475569", marginBottom: 8 }}>Cambiar estado:</div>
+                  <div style={{ fontSize: 11, color: "#cbd5e1", marginBottom: 8, fontWeight: 600}}>Cambiar estado:</div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                     {STATUSES.map(s => { const c = S_COLOR[s]; return (
                       <button key={s} className="btn" onClick={() => changeStatus(s)}
-                        style={{ fontSize: 11, padding: "5px 11px", background: status === s ? c.bg : "#111c30", color: status === s ? c.text : "#475569", border: `1px solid ${status === s ? c.dot : "transparent"}` }}>{s}</button>
+                        style={{ fontSize: 11, padding: "5px 11px", background: status === s ? c.bg : "#111c30", color: status === s ? c.text : "#cbd5e1", border: `1px solid ${status === s ? c.dot : "transparent"}`, fontWeight: 600}}>{s}</button>
                     ); })}
                   </div>
                 </div>
@@ -992,7 +992,7 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
                   </div>
                 ))}
               </div>
-            ) : <div style={{ color: "#334155", textAlign: "center", padding: 24 }}>Sin procedimiento asignado.</div>}
+            ) : <div style={{ color: "#cbd5e1", textAlign: "center", padding: 24, fontWeight: 600}}>Sin procedimiento asignado.</div>}
           </div>
         )}
       </div>
@@ -1031,7 +1031,7 @@ function NewOT({ equipment, locations, jis, users, onClose, onSave }) {
       <div className="mod fd">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
           <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 16, color: "#f1f5f9" }}>+ Nueva Orden de Trabajo</div>
-          <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "5px 11px" }}>✕</button>
+          <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#cbd5e1", padding: "5px 11px", fontWeight: 600}}>✕</button>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
           <Lbl l="Título *"><input className="inp" placeholder="Título de la OT" value={f.title} onChange={e => s("title", e.target.value)} /></Lbl>
@@ -1058,13 +1058,13 @@ function NewOT({ equipment, locations, jis, users, onClose, onSave }) {
           <div style={{ background: "#060b14", borderRadius: 9, padding: 12 }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: D_COLOR[f.discipline], marginBottom: 8 }}>{D_ICON[f.discipline]} Parámetros precargados — {f.discipline} ({previewParams.length})</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-              {previewParams.map((p, i) => <span key={i} style={{ background: "#0b1629", border: "1px solid #14213a", borderRadius: 5, padding: "3px 8px", fontSize: 11, color: "#64748b" }}>{p.name} ({p.unit})</span>)}
+              {previewParams.map((p, i) => <span key={i} style={{ background: "#0b1629", border: "1px solid #14213a", borderRadius: 5, padding: "3px 8px", fontSize: 11, color: "#cbd5e1", fontWeight: 600}}>{p.name} ({p.unit})</span>)}
             </div>
           </div>
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "8px 16px", fontSize: 13 }}>Cancelar</button>
+            <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#cbd5e1", padding: "8px 16px", fontSize: 13, fontWeight: 600}}>Cancelar</button>
             <button className="btn" onClick={submit} disabled={!f.title || saving}
-              style={{ background: f.title && !saving ? "linear-gradient(135deg,#1d4ed8,#7c3aed)" : "#111c30", color: f.title && !saving ? "#fff" : "#475569", padding: "8px 20px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+              style={{ background: f.title && !saving ? "linear-gradient(135deg,#1d4ed8,#7c3aed)" : "#111c30", color: f.title && !saving ? "#fff" : "#cbd5e1", padding: "8px 20px", fontSize: 13, display: "flex", alignItems: "center", gap: 6, fontWeight: 600}}>
               {saving ? <><Spinner /> Creando...</> : "Crear OT"}
             </button>
           </div>
@@ -1090,7 +1090,7 @@ function NewEquip({ locations, onClose, onSave }) {
       <div className="mod fd" style={{ width: 460 }}>
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 18 }}>
           <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 16, color: "#f1f5f9" }}>🏭 Nuevo Equipo</div>
-          <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "5px 11px" }}>✕</button>
+          <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#cbd5e1", padding: "5px 11px", fontWeight: 600}}>✕</button>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -1104,7 +1104,7 @@ function NewEquip({ locations, onClose, onSave }) {
           </div>
           <Lbl l="Estado"><select className="inp" value={f.status} onChange={e => s("status", e.target.value)}><option>Operativo</option><option>En mantenimiento</option><option>Fuera de servicio</option></select></Lbl>
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 }}>
-            <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "8px 16px", fontSize: 13 }}>Cancelar</button>
+            <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#cbd5e1", padding: "8px 16px", fontSize: 13, fontWeight: 600}}>Cancelar</button>
             <button className="btn" onClick={submit} disabled={!f.code || saving} style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "8px 18px", fontSize: 13 }}>{saving ? "Guardando..." : "Guardar"}</button>
           </div>
         </div>
@@ -1123,14 +1123,14 @@ function NewLoc({ onClose, onSave }) {
       <div className="mod fd" style={{ width: 400 }}>
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 18 }}>
           <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 16, color: "#f1f5f9" }}>📍 Nueva Ubicación</div>
-          <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "5px 11px" }}>✕</button>
+          <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#cbd5e1", padding: "5px 11px", fontWeight: 600}}>✕</button>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <Lbl l="Nombre *"><input className="inp" placeholder="Planta C" value={f.name} onChange={e => setF(p => ({ ...p, name: e.target.value }))} /></Lbl>
           <Lbl l="Área"><input className="inp" placeholder="Producción..." value={f.area} onChange={e => setF(p => ({ ...p, area: e.target.value }))} /></Lbl>
           <Lbl l="Nivel"><input className="inp" placeholder="Nivel 1..." value={f.level} onChange={e => setF(p => ({ ...p, level: e.target.value }))} /></Lbl>
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 }}>
-            <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "8px 16px", fontSize: 13 }}>Cancelar</button>
+            <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#cbd5e1", padding: "8px 16px", fontSize: 13, fontWeight: 600}}>Cancelar</button>
             <button className="btn" onClick={submit} disabled={!f.name || saving} style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "8px 18px", fontSize: 13 }}>{saving ? "Guardando..." : "Guardar"}</button>
           </div>
         </div>
@@ -1155,7 +1155,7 @@ function NewJI({ onClose, onSave }) {
       <div className="mod fd">
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 18 }}>
           <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 16, color: "#f1f5f9" }}>📖 Nueva Job Instruction</div>
-          <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "5px 11px" }}>✕</button>
+          <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#cbd5e1", padding: "5px 11px", fontWeight: 600}}>✕</button>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -1165,7 +1165,7 @@ function NewJI({ onClose, onSave }) {
           <Lbl l="Título *"><input className="inp" value={f.title} onChange={e => setF(p => ({ ...p, title: e.target.value }))} /></Lbl>
           <Lbl l="Disciplina"><select className="inp" value={f.discipline} onChange={e => setF(p => ({ ...p, discipline: e.target.value }))}>{DISCIPLINES.map(d => <option key={d}>{d}</option>)}</select></Lbl>
           <div>
-            <div style={{ fontSize: 10, color: "#334155", marginBottom: 7, textTransform: "uppercase" }}>Pasos</div>
+            <div style={{ fontSize: 10, color: "#cbd5e1", marginBottom: 7, textTransform: "uppercase", fontWeight: 600}}>Pasos</div>
             {steps.map((s, i) => (
               <div key={i} style={{ display: "flex", gap: 7, marginBottom: 6 }}>
                 <div style={{ width: 22, height: 36, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "#3b82f6", fontWeight: 700 }}>{i + 1}</div>
@@ -1176,7 +1176,7 @@ function NewJI({ onClose, onSave }) {
             <button className="btn" onClick={() => setSteps(p => [...p, ""])} style={{ background: "#111c30", color: "#60a5fa", padding: "5px 13px", fontSize: 12, marginTop: 3 }}>+ Paso</button>
           </div>
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 }}>
-            <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "8px 16px", fontSize: 13 }}>Cancelar</button>
+            <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#cbd5e1", padding: "8px 16px", fontSize: 13, fontWeight: 600}}>Cancelar</button>
             <button className="btn" onClick={submit} disabled={!f.title || saving} style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "8px 18px", fontSize: 13 }}>{saving ? "Guardando..." : "Guardar"}</button>
           </div>
         </div>
@@ -1230,19 +1230,19 @@ function ParamChart({ paramName, unit, color, allReadings }) {
   return (
     <div className="card" style={{ marginBottom: 0 }}>
       <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 12, color: color, marginBottom: 2 }}>{paramName}</div>
-      <div style={{ fontSize: 10, color: "#475569", marginBottom: 8 }}>{unit}</div>
+      <div style={{ fontSize: 10, color: "#cbd5e1", marginBottom: 8, fontWeight: 600}}>{unit}</div>
       {data.length > 0 ? (
         <ResponsiveContainer width="100%" height={130}>
           <LineChart data={data}>
             <CartesianGrid strokeDasharray="3 3" stroke="#111c30" />
-            <XAxis dataKey="fecha" stroke="#334155" fontSize={8} tick={{ fill: "#475569" }} />
-            <YAxis stroke="#334155" fontSize={9} tick={{ fill: "#475569" }} width={35} />
+            <XAxis dataKey="fecha" stroke="#334155" fontSize={8} tick={{ fill: "#cbd5e1" }} />
+            <YAxis stroke="#334155" fontSize={9} tick={{ fill: "#cbd5e1" }} width={35} />
             <Tooltip contentStyle={{ background: "#0b1629", border: "1px solid #1a2740", borderRadius: 8, fontSize: 11, color: "#e2e8f0" }} />
             <Line type="monotone" dataKey="valor" stroke={color} strokeWidth={2} dot={{ fill: color, r: 2 }} name={unit} />
           </LineChart>
         </ResponsiveContainer>
       ) : (
-        <div style={{ height: 130, display: "flex", alignItems: "center", justifyContent: "center", color: "#334155", fontSize: 12 }}>Sin datos aún</div>
+        <div style={{ height: 130, display: "flex", alignItems: "center", justifyContent: "center", color: "#cbd5e1", fontSize: 12, fontWeight: 600}}>Sin datos aún</div>
       )}
     </div>
   );
@@ -1314,7 +1314,7 @@ function ManualReadingForm({ onClose, equipment, onSaved }) {
       <div className="mod fd" style={{ width: 700, maxHeight: "85vh", overflowY: "auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
           <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 15, color: "#f1f5f9" }}>📊 Ingreso Manual de Lecturas</div>
-          <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "4px 10px" }}>✕</button>
+          <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#cbd5e1", padding: "4px 10px", fontWeight: 600}}>✕</button>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
           <Lbl l="TAG / Equipo">
@@ -1343,7 +1343,7 @@ function ManualReadingForm({ onClose, equipment, onSaved }) {
         ))}
         {msg && <div style={{ fontSize: 12, color: msg.startsWith("✅") ? "#34d399" : "#f87171", background: msg.startsWith("✅") ? "#0d2d1f" : "#3b0f0f", padding: "8px 12px", borderRadius: 7, marginBottom: 10 }}>{msg}</div>}
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-          <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "8px 16px", fontSize: 13 }}>Cancelar</button>
+          <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#cbd5e1", padding: "8px 16px", fontSize: 13, fontWeight: 600}}>Cancelar</button>
           <button className="btn" onClick={save} disabled={saving || !tag} style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "8px 20px", fontSize: 13 }}>
             {saving ? "Guardando..." : "💾 Guardar Lecturas"}
           </button>
@@ -1444,31 +1444,31 @@ function DashboardOperativo({ allReadings, equipment, onRefresh }) {
       </div>
       {/* FILTROS */}
       <div className="card" style={{ marginBottom: 18, padding: "14px 18px" }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 12 }}>🔽 Filtros</div>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "#cbd5e1", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 12 }}>🔽 Filtros</div>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
           <div style={{ flex: 1, minWidth: 160 }}>
-            <div style={{ fontSize: 10, color: "#475569", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>Fecha de Cierre</div>
+            <div style={{ fontSize: 10, color: "#cbd5e1", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600}}>Fecha de Cierre</div>
             <select className="inp" value={filterFecha} onChange={e => setFilterFecha(e.target.value)}>
               <option value="">Todas las fechas</option>
               {fechas.map(f => <option key={f} value={f}>{f}</option>)}
             </select>
           </div>
           <div style={{ flex: 1, minWidth: 160 }}>
-            <div style={{ fontSize: 10, color: "#475569", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>TAG / Equipo</div>
+            <div style={{ fontSize: 10, color: "#cbd5e1", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600}}>TAG / Equipo</div>
             <select className="inp" value={filterTag} onChange={e => { setFilterTag(e.target.value); setFilterSubarea(""); }}>
               <option value="">Todos los TAGs</option>
               {tags.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
           <div style={{ flex: 1, minWidth: 160 }}>
-            <div style={{ fontSize: 10, color: "#475569", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>Área</div>
+            <div style={{ fontSize: 10, color: "#cbd5e1", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600}}>Área</div>
             <select className="inp" value={filterArea} onChange={e => { setFilterArea(e.target.value); setFilterTag(""); setFilterSubarea(""); }}>
               <option value="">Todas las áreas</option>
               {areas.map(a => <option key={a} value={a}>{a}</option>)}
             </select>
           </div>
           <div style={{ flex: 1, minWidth: 160 }}>
-            <div style={{ fontSize: 10, color: "#475569", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>Sub-Área</div>
+            <div style={{ fontSize: 10, color: "#cbd5e1", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600}}>Sub-Área</div>
             <select className="inp" value={filterSubarea} onChange={e => setFilterSubarea(e.target.value)}>
               <option value="">Todas las sub-áreas</option>
               {subareas.map(s => <option key={s} value={s}>{s}</option>)}
@@ -1502,7 +1502,7 @@ function DashboardOperativo({ allReadings, equipment, onRefresh }) {
           <div key={s.l} className="card" style={{ borderLeft: "3px solid " + s.c }}>
             <div style={{ fontSize: 18, marginBottom: 4 }}>{s.i}</div>
             <div style={{ fontFamily: "Syne,sans-serif", fontSize: 22, fontWeight: 800, color: s.c }}>{s.v}</div>
-            <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>{s.l}</div>
+            <div style={{ fontSize: 11, color: "#cbd5e1", marginTop: 2, fontWeight: 600}}>{s.l}</div>
           </div>
         ))}
       </div>
@@ -1551,14 +1551,14 @@ function DashboardOperativo({ allReadings, equipment, onRefresh }) {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))", gap: 10 }}>
               {tags.map(tag => {
                 const ef = calcEficiencia(tag);
-                const color = ef === null ? "#475569" : ef >= 75 ? "#34d399" : ef >= 60 ? "#facc15" : "#f87171";
+                const color = ef === null ? "#cbd5e1" : ef >= 75 ? "#34d399" : ef >= 60 ? "#facc15" : "#f87171";
                 return (
                   <div key={tag} className="card" style={{ borderLeft: "3px solid " + color, textAlign: "center" }}>
-                    <div style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>🏷️ {tag}</div>
+                    <div style={{ fontSize: 11, color: "#cbd5e1", marginBottom: 4, fontWeight: 600}}>🏷️ {tag}</div>
                     <div style={{ fontFamily: "Syne,sans-serif", fontSize: 26, fontWeight: 800, color }}>
                       {ef === null ? "N/D" : ef.toFixed(1) + "%"}
                     </div>
-                    <div style={{ fontSize: 10, color: "#475569", marginTop: 2 }}>Eficiencia ηT</div>
+                    <div style={{ fontSize: 10, color: "#cbd5e1", marginTop: 2, fontWeight: 600}}>Eficiencia ηT</div>
                   </div>
                 );
               })}
@@ -1640,8 +1640,8 @@ function DashboardOperativo({ allReadings, equipment, onRefresh }) {
               <ResponsiveContainer width="100%" height={260}>
                 <LineChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e3a5f" />
-                  <XAxis dataKey="fecha" tick={{ fill: "#475569", fontSize: 10 }} />
-                  <YAxis domain={[0, 100]} tick={{ fill: "#475569", fontSize: 10 }} unit="%" />
+                  <XAxis dataKey="fecha" tick={{ fill: "#cbd5e1", fontSize: 10 }} />
+                  <YAxis domain={[0, 100]} tick={{ fill: "#cbd5e1", fontSize: 10 }} unit="%" />
                   <Tooltip
                     contentStyle={{ background: "#0d1b2e", border: "1px solid #1e3a5f", borderRadius: 8 }}
                     labelStyle={{ color: "#94a3b8" }}
@@ -1662,7 +1662,7 @@ function DashboardOperativo({ allReadings, equipment, onRefresh }) {
       {/* TABLA DE LECTURAS INGRESADAS */}
       {filtered.length > 0 && (
         <div style={{ marginTop: 8 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: "#cbd5e1", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
             📋 Lecturas Ingresadas <div style={{ flex: 1, height: 1, background: "#1a2740" }} />
           </div>
           <div style={{ overflowX: "auto" }}>
@@ -1686,8 +1686,8 @@ function DashboardOperativo({ allReadings, equipment, onRefresh }) {
                       <td style={{ color: "#60a5fa", fontWeight: 700 }}>{tag}</td>
                       <td style={{ color: "#94a3b8" }}>{r.parameters?.name || "—"}</td>
                       <td style={{ color: "#f1f5f9", fontWeight: 600 }}>{r.value}</td>
-                      <td style={{ color: "#475569" }}>{r.parameters?.unit || "—"}</td>
-                      <td style={{ color: "#475569", fontSize: 11 }}>{r.created_at ? new Date(r.created_at).toLocaleDateString("es-CO") : "—"}</td>
+                      <td style={{ color: "#cbd5e1", fontWeight: 600}}>{r.parameters?.unit || "—"}</td>
+                      <td style={{ color: "#cbd5e1", fontSize: 11, fontWeight: 600}}>{r.created_at ? new Date(r.created_at).toLocaleDateString("es-CO") : "—"}</td>
                       <td>
                         <button className="btn" onClick={async () => {
                           if (!window.confirm("¿Eliminar esta lectura?")) return;
@@ -1741,29 +1741,29 @@ function ImportEquip({ onClose, onSave }) {
       <div className="mod fd" style={{ width: 600 }}>
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 18 }}>
           <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 16, color: "#f1f5f9" }}>📥 Importar Equipos desde Excel</div>
-          <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "5px 11px" }}>✕</button>
+          <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#cbd5e1", padding: "5px 11px", fontWeight: 600}}>✕</button>
         </div>
-        <div style={{ fontSize: 12, color: "#475569", marginBottom: 12, background: "#060b14", padding: "10px 14px", borderRadius: 8 }}>
+        <div style={{ fontSize: 12, color: "#cbd5e1", marginBottom: 12, background: "#060b14", padding: "10px 14px", borderRadius: 8, fontWeight: 600}}>
           Encabezados en <strong style={{ color: "#60a5fa" }}>fila 1</strong>, datos desde <strong style={{ color: "#60a5fa" }}>fila 2</strong>. Columnas: <strong style={{ color: "#34d399" }}>TAG, TIPO, AREA, SUBAREA</strong>
         </div>
         <div onClick={() => fileRef.current && fileRef.current.click()} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) parseFile(f); }}
           style={{ border: "2px dashed #1a2740", borderRadius: 10, padding: 24, textAlign: "center", cursor: "pointer", marginBottom: 14, background: "#060b14" }}>
           <div style={{ fontSize: 28, marginBottom: 6 }}>📊</div>
-          <div style={{ fontSize: 13, color: "#64748b" }}>Arrastra o haz clic para seleccionar</div>
+          <div style={{ fontSize: 13, color: "#cbd5e1", fontWeight: 600}}>Arrastra o haz clic para seleccionar</div>
           <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: "none" }} onChange={e => { const f = e.target.files[0]; if (f) parseFile(f); }} />
         </div>
-        {loading && <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#64748b", fontSize: 13, marginBottom: 10 }}><div className="spin" /> {status}</div>}
+        {loading && <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#cbd5e1", fontSize: 13, marginBottom: 10, fontWeight: 600}}><div className="spin" /> {status}</div>}
         {!loading && status && <div style={{ fontSize: 13, color: done ? "#34d399" : "#60a5fa", marginBottom: 12, padding: "8px 12px", background: "#060b14", borderRadius: 7 }}>{status}</div>}
         {preview.length > 0 && !done && (
           <div>
             <div style={{ overflowX: "auto", marginBottom: 12 }}>
               <table className="ptable">
                 <thead><tr>{["TAG","Tipo","Área","Sub-área","Disciplina"].map(h => <th key={h}>{h}</th>)}</tr></thead>
-                <tbody>{preview.slice(0, 8).map((r, i) => <tr key={i}><td style={{ color: "#3b82f6", fontWeight: 700 }}>{r.code}</td><td style={{ color: "#cbd5e1" }}>{r.type || "—"}</td><td style={{ color: "#94a3b8" }}>{r.area || "—"}</td><td style={{ color: "#94a3b8" }}>{r.subarea || "—"}</td><td style={{ color: D_COLOR[r.discipline] || "#64748b" }}>{r.discipline}</td></tr>)}</tbody>
+                <tbody>{preview.slice(0, 8).map((r, i) => <tr key={i}><td style={{ color: "#3b82f6", fontWeight: 700 }}>{r.code}</td><td style={{ color: "#cbd5e1" }}>{r.type || "—"}</td><td style={{ color: "#94a3b8" }}>{r.area || "—"}</td><td style={{ color: "#94a3b8" }}>{r.subarea || "—"}</td><td style={{ color: D_COLOR[r.discipline] || "#cbd5e1", fontWeight: 600}}>{r.discipline}</td></tr>)}</tbody>
               </table>
             </div>
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "8px 16px", fontSize: 13 }}>Cancelar</button>
+              <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#cbd5e1", padding: "8px 16px", fontSize: 13, fontWeight: 600}}>Cancelar</button>
               <button className="btn" onClick={importAll} disabled={loading} style={{ background: "linear-gradient(135deg,#065f46,#0f766e)", color: "#34d399", padding: "8px 18px", fontSize: 13 }}>⬆️ Importar {preview.length} equipos</button>
             </div>
           </div>
@@ -1794,7 +1794,7 @@ function EditEquip({ eq, onClose, onSave }) {
       <div className="mod fd" style={{ width: 480 }}>
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 18 }}>
           <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 16, color: "#f1f5f9" }}>✏️ Editar Equipo</div>
-          <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "5px 11px" }}>✕</button>
+          <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#cbd5e1", padding: "5px 11px", fontWeight: 600}}>✕</button>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -1807,7 +1807,7 @@ function EditEquip({ eq, onClose, onSave }) {
           </div>
           <Lbl l="Estado"><select className="inp" value={f.status} onChange={e => s("status", e.target.value)}><option>Operativo</option><option>En mantenimiento</option><option>Fuera de servicio</option></select></Lbl>
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 }}>
-            <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#64748b", padding: "8px 16px", fontSize: 13 }}>Cancelar</button>
+            <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#cbd5e1", padding: "8px 16px", fontSize: 13, fontWeight: 600}}>Cancelar</button>
             <button className="btn" onClick={submit} disabled={!f.code || saving} style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "8px 18px", fontSize: 13 }}>{saving ? "Guardando..." : "💾 Guardar"}</button>
           </div>
         </div>
@@ -1974,12 +1974,12 @@ function ImportHistorico({ equipment }) {
   return (
     <div className="fd">
       <div style={{ fontFamily: "Syne,sans-serif", fontSize: 15, fontWeight: 700, color: "#f1f5f9", marginBottom: 6 }}>📥 Importar Parámetros Históricos</div>
-      <div style={{ fontSize: 12, color: "#475569", marginBottom: 18 }}>
+      <div style={{ fontSize: 12, color: "#cbd5e1", marginBottom: 18, fontWeight: 600}}>
         Carga el Excel <strong style={{ color: "#60a5fa" }}>PARAMETROS GENERALES</strong> con datos históricos. El sistema buscará cada TAG en Equipos y cargará las lecturas en el Dashboard Operativo.
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 11, color: "#64748b", marginBottom: 10, fontWeight: 600, textTransform: "uppercase" }}>Estructura esperada del Excel:</div>
+        <div style={{ fontSize: 11, color: "#cbd5e1", marginBottom: 10, fontWeight: 600, textTransform: "uppercase" }}>Estructura esperada del Excel:</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px,1fr))", gap: 8 }}>
           {["AREA (Col A)","SUBAREA (Col B)","TAG (Col C)","FECHA (Col F)","N° OT (Col G)","Parámetros Mecánicos (H-U)","Parámetros Eléctricos (V-AC)"].map(c => (
             <div key={c} style={{ background: "#060b14", borderRadius: 6, padding: "6px 10px", fontSize: 11, color: "#94a3b8" }}>{c}</div>
@@ -1992,7 +1992,7 @@ function ImportHistorico({ equipment }) {
         onDrop={e => { e.preventDefault(); if (!loading) { const f = e.dataTransfer.files[0]; if (f) processFile(f); } }}
         style={{ border: "2px dashed #1a2740", borderRadius: 10, padding: 32, textAlign: "center", cursor: loading ? "not-allowed" : "pointer", background: "#060b14", marginBottom: 14 }}>
         <div style={{ fontSize: 36, marginBottom: 10 }}>📊</div>
-        <div style={{ fontSize: 14, color: "#64748b" }}>{loading ? "Importando, por favor espera..." : "Arrastra o haz clic para seleccionar el Excel histórico"}</div>
+        <div style={{ fontSize: 14, color: "#cbd5e1", fontWeight: 600}}>{loading ? "Importando, por favor espera..." : "Arrastra o haz clic para seleccionar el Excel histórico"}</div>
         <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: "none" }} onChange={e => { const f = e.target.files[0]; if (f) processFile(f); }} />
       </div>
 
@@ -2005,7 +2005,7 @@ function ImportHistorico({ equipment }) {
           <div style={{ background: "#060b14", borderRadius: 6, height: 6, overflow: "hidden" }}>
             <div style={{ height: "100%", background: "linear-gradient(90deg,#3b82f6,#7c3aed)", width: progress.total ? (((progress.ok + progress.skip) / progress.total) * 100) + "%" : "0%", transition: "width .3s" }} />
           </div>
-          <div style={{ fontSize: 11, color: "#475569", marginTop: 6 }}>{progress.ok + progress.skip} de {progress.total} registros procesados</div>
+          <div style={{ fontSize: 11, color: "#cbd5e1", marginTop: 6, fontWeight: 600}}>{progress.ok + progress.skip} de {progress.total} registros procesados</div>
         </div>
       )}
 
@@ -2082,7 +2082,7 @@ function SolpedPage() {
           <div className="mod fd" style={{ width: 620 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
               <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 15, color: "#f1f5f9" }}>{editId ? "Editar" : "Nuevo"} Registro</div>
-              <button className="btn" onClick={() => setShowForm(false)} style={{ background: "#111c30", color: "#64748b", padding: "4px 10px" }}>✕</button>
+              <button className="btn" onClick={() => setShowForm(false)} style={{ background: "#111c30", color: "#cbd5e1", padding: "4px 10px", fontWeight: 600}}>✕</button>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -2127,7 +2127,7 @@ function SolpedPage() {
                 </div>
               </Lbl>
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                <button className="btn" onClick={() => setShowForm(false)} style={{ background: "#111c30", color: "#64748b", padding: "8px 16px", fontSize: 13 }}>Cancelar</button>
+                <button className="btn" onClick={() => setShowForm(false)} style={{ background: "#111c30", color: "#cbd5e1", padding: "8px 16px", fontSize: 13, fontWeight: 600}}>Cancelar</button>
                 <button className="btn" onClick={save} style={{ background: "linear-gradient(135deg,#065f46,#0f766e)", color: "#34d399", padding: "8px 18px", fontSize: 13 }}>💾 Guardar</button>
               </div>
             </div>
@@ -2135,12 +2135,12 @@ function SolpedPage() {
         </div>
       )}
 
-      {loading ? <div style={{ color: "#475569", textAlign: "center", padding: 40 }}>Cargando...</div> : (
+      {loading ? <div style={{ color: "#cbd5e1", textAlign: "center", padding: 40, fontWeight: 600}}>Cargando...</div> : (
         <div style={{ overflowX: "auto" }}>
           <table className="ptable">
             <thead><tr>{["Tipo","Área","N° Solped","Actividad","Avances","Prioridad","Avance %","Estado","F. Inicio","F. Fin","Archivo","Acciones"].map(h => <th key={h}>{h}</th>)}</tr></thead>
             <tbody>
-              {items.length === 0 ? <tr><td colSpan={11} style={{ textAlign: "center", color: "#334155", padding: 24 }}>Sin registros aún.</td></tr> :
+              {items.length === 0 ? <tr><td colSpan={11} style={{ textAlign: "center", color: "#cbd5e1", padding: 24, fontWeight: 600}}>Sin registros aún.</td></tr> :
               items.map(item => (
                 <tr key={item.id}>
                   <td style={{ color: "#60a5fa" }}>{item.tipo}</td>
@@ -2148,19 +2148,19 @@ function SolpedPage() {
                   <td style={{ color: "#3b82f6", fontWeight: 700 }}>{item.solped}</td>
                   <td style={{ color: "#cbd5e1" }}>{item.actividad}</td>
                   <td style={{ color: "#94a3b8", fontSize: 11 }}>{item.avances}</td>
-                  <td style={{ color: P_COLOR[item.prioridad] || "#64748b", fontWeight: 600 }}>{item.prioridad}</td>
+                  <td style={{ color: P_COLOR[item.prioridad] || "#cbd5e1", fontWeight: 600 }}>{item.prioridad}</td>
                   <td>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       <div style={{ background: "#111c30", borderRadius: 99, height: 6, width: 60, overflow: "hidden" }}>
                         <div style={{ height: "100%", background: item.avance_pct >= 100 ? "#34d399" : "#3b82f6", width: item.avance_pct + "%" }} />
                       </div>
-                      <span style={{ fontSize: 11, color: "#64748b" }}>{item.avance_pct}%</span>
+                      <span style={{ fontSize: 11, color: "#cbd5e1", fontWeight: 600}}>{item.avance_pct}%</span>
                     </div>
                   </td>
                   <td><span className="tag" style={{ background: item.estado === "Completado" ? "#1e3a2a" : item.estado === "Cancelado" ? "#3b0f0f" : item.estado === "En Proceso" ? "#1e2a3a" : "#2a2a1e", color: item.estado === "Completado" ? "#34d399" : item.estado === "Cancelado" ? "#f87171" : item.estado === "En Proceso" ? "#60a5fa" : "#fbbf24" }}>{item.estado}</span></td>
-                  <td style={{ color: "#475569", fontSize: 11 }}>{item.fecha_inicio}</td>
-                  <td style={{ color: "#475569", fontSize: 11 }}>{item.fecha_fin}</td>
-                  <td>{item.archivo_url ? <a href={item.archivo_url} target="_blank" rel="noreferrer" style={{ color: "#34d399", fontSize: 11 }}>📎 Ver</a> : <span style={{ color: "#334155", fontSize: 11 }}>—</span>}</td>
+                  <td style={{ color: "#cbd5e1", fontSize: 11, fontWeight: 600}}>{item.fecha_inicio}</td>
+                  <td style={{ color: "#cbd5e1", fontSize: 11, fontWeight: 600}}>{item.fecha_fin}</td>
+                  <td>{item.archivo_url ? <a href={item.archivo_url} target="_blank" rel="noreferrer" style={{ color: "#34d399", fontSize: 11 }}>📎 Ver</a> : <span style={{ color: "#cbd5e1", fontSize: 11, fontWeight: 600}}>—</span>}</td>
                   <td style={{ display: "flex", gap: 5 }}>
                     <button className="btn" onClick={() => { setForm({ tipo: item.tipo, area: item.area, solped: item.solped, actividad: item.actividad, avances: item.avances, prioridad: item.prioridad, avance_pct: item.avance_pct, estado: item.estado, fecha_inicio: item.fecha_inicio || "", fecha_fin: item.fecha_fin || "", archivo_url: item.archivo_url || "" }); setEditId(item.id); setShowForm(true); }} style={{ background: "#0f2040", color: "#60a5fa", padding: "3px 9px", fontSize: 11 }}>✏️</button>
                     <button className="btn" onClick={() => del(item.id)} style={{ background: "#3b0f0f", color: "#f87171", padding: "3px 9px", fontSize: 11 }}>🗑️</button>
@@ -2237,7 +2237,7 @@ function AvisosPage() {
           <div className="mod fd" style={{ width: 620 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
               <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 15, color: "#f1f5f9" }}>{editId ? "Editar" : "Nuevo"} Aviso</div>
-              <button className="btn" onClick={() => setShowForm(false)} style={{ background: "#111c30", color: "#64748b", padding: "4px 10px" }}>✕</button>
+              <button className="btn" onClick={() => setShowForm(false)} style={{ background: "#111c30", color: "#cbd5e1", padding: "4px 10px", fontWeight: 600}}>✕</button>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -2278,7 +2278,7 @@ function AvisosPage() {
                 </div>
               </Lbl>
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                <button className="btn" onClick={() => setShowForm(false)} style={{ background: "#111c30", color: "#64748b", padding: "8px 16px", fontSize: 13 }}>Cancelar</button>
+                <button className="btn" onClick={() => setShowForm(false)} style={{ background: "#111c30", color: "#cbd5e1", padding: "8px 16px", fontSize: 13, fontWeight: 600}}>Cancelar</button>
                 <button className="btn" onClick={save} style={{ background: "linear-gradient(135deg,#065f46,#0f766e)", color: "#34d399", padding: "8px 18px", fontSize: 13 }}>💾 Guardar</button>
               </div>
             </div>
@@ -2286,12 +2286,12 @@ function AvisosPage() {
         </div>
       )}
 
-      {loading ? <div style={{ color: "#475569", textAlign: "center", padding: 40 }}>Cargando...</div> : (
+      {loading ? <div style={{ color: "#cbd5e1", textAlign: "center", padding: 40, fontWeight: 600}}>Cargando...</div> : (
         <div style={{ overflowX: "auto" }}>
           <table className="ptable">
             <thead><tr>{["Área","OT Aviso","N° Aviso","Actividad","Acciones Tomadas","Prioridad","Avance %","Estado","F. Reporte","F. Fin","Archivo","Acciones"].map(h => <th key={h}>{h}</th>)}</tr></thead>
             <tbody>
-              {items.length === 0 ? <tr><td colSpan={11} style={{ textAlign: "center", color: "#334155", padding: 24 }}>Sin avisos aún.</td></tr> :
+              {items.length === 0 ? <tr><td colSpan={11} style={{ textAlign: "center", color: "#cbd5e1", padding: 24, fontWeight: 600}}>Sin avisos aún.</td></tr> :
               items.map(item => (
                 <tr key={item.id}>
                   <td style={{ color: "#94a3b8" }}>{item.area}</td>
@@ -2299,19 +2299,19 @@ function AvisosPage() {
                   <td style={{ color: "#60a5fa", fontWeight: 700 }}>{item.n_aviso}</td>
                   <td style={{ color: "#cbd5e1" }}>{item.actividad}</td>
                   <td style={{ color: "#94a3b8", fontSize: 11 }}>{item.acciones}</td>
-                  <td style={{ color: P_COLOR[item.prioridad] || "#64748b", fontWeight: 600 }}>{item.prioridad}</td>
+                  <td style={{ color: P_COLOR[item.prioridad] || "#cbd5e1", fontWeight: 600 }}>{item.prioridad}</td>
                   <td>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       <div style={{ background: "#111c30", borderRadius: 99, height: 6, width: 60, overflow: "hidden" }}>
                         <div style={{ height: "100%", background: item.avance_pct >= 100 ? "#34d399" : "#3b82f6", width: item.avance_pct + "%" }} />
                       </div>
-                      <span style={{ fontSize: 11, color: "#64748b" }}>{item.avance_pct}%</span>
+                      <span style={{ fontSize: 11, color: "#cbd5e1", fontWeight: 600}}>{item.avance_pct}%</span>
                     </div>
                   </td>
                   <td><span className="tag" style={{ background: item.estado === "Completado" ? "#1e3a2a" : item.estado === "Cancelado" ? "#3b0f0f" : item.estado === "En Proceso" ? "#1e2a3a" : "#2a2a1e", color: item.estado === "Completado" ? "#34d399" : item.estado === "Cancelado" ? "#f87171" : item.estado === "En Proceso" ? "#60a5fa" : "#fbbf24" }}>{item.estado}</span></td>
-                  <td style={{ color: "#475569", fontSize: 11 }}>{item.fecha_reporte}</td>
-                  <td style={{ color: "#475569", fontSize: 11 }}>{item.fecha_fin}</td>
-                  <td>{item.archivo_url ? <a href={item.archivo_url} target="_blank" rel="noreferrer" style={{ color: "#34d399", fontSize: 11 }}>📎 Ver</a> : <span style={{ color: "#334155", fontSize: 11 }}>—</span>}</td>
+                  <td style={{ color: "#cbd5e1", fontSize: 11, fontWeight: 600}}>{item.fecha_reporte}</td>
+                  <td style={{ color: "#cbd5e1", fontSize: 11, fontWeight: 600}}>{item.fecha_fin}</td>
+                  <td>{item.archivo_url ? <a href={item.archivo_url} target="_blank" rel="noreferrer" style={{ color: "#34d399", fontSize: 11 }}>📎 Ver</a> : <span style={{ color: "#cbd5e1", fontSize: 11, fontWeight: 600}}>—</span>}</td>
                   <td style={{ display: "flex", gap: 5 }}>
                     <button className="btn" onClick={() => { setForm({ area: item.area, ot_aviso: item.ot_aviso, n_aviso: item.n_aviso, actividad: item.actividad, acciones: item.acciones, prioridad: item.prioridad, avance_pct: item.avance_pct, estado: item.estado, fecha_reporte: item.fecha_reporte || "", fecha_fin: item.fecha_fin || "", archivo_url: item.archivo_url || "" }); setEditId(item.id); setShowForm(true); }} style={{ background: "#0f2040", color: "#60a5fa", padding: "3px 9px", fontSize: 11 }}>✏️</button>
                     <button className="btn" onClick={() => del(item.id)} style={{ background: "#3b0f0f", color: "#f87171", padding: "3px 9px", fontSize: 11 }}>🗑️</button>
@@ -2399,7 +2399,7 @@ function TallerPage() {
           <div className="mod fd" style={{ width: 660 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
               <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 15, color: "#f1f5f9" }}>{editId ? "Editar" : "Nuevo"} Registro de Taller</div>
-              <button className="btn" onClick={() => setShowForm(false)} style={{ background: "#111c30", color: "#64748b", padding: "4px 10px" }}>✕</button>
+              <button className="btn" onClick={() => setShowForm(false)} style={{ background: "#111c30", color: "#cbd5e1", padding: "4px 10px", fontWeight: 600}}>✕</button>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -2448,7 +2448,7 @@ function TallerPage() {
                 </div>
               </Lbl>
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                <button className="btn" onClick={() => setShowForm(false)} style={{ background: "#111c30", color: "#64748b", padding: "8px 16px", fontSize: 13 }}>Cancelar</button>
+                <button className="btn" onClick={() => setShowForm(false)} style={{ background: "#111c30", color: "#cbd5e1", padding: "8px 16px", fontSize: 13, fontWeight: 600}}>Cancelar</button>
                 <button className="btn" onClick={save} style={{ background: "linear-gradient(135deg,#065f46,#0f766e)", color: "#34d399", padding: "8px 18px", fontSize: 13 }}>💾 Guardar</button>
               </div>
             </div>
@@ -2456,12 +2456,12 @@ function TallerPage() {
         </div>
       )}
 
-      {loading ? <div style={{ color: "#475569", textAlign: "center", padding: 40 }}>Cargando...</div> : (
+      {loading ? <div style={{ color: "#cbd5e1", textAlign: "center", padding: 40, fontWeight: 600}}>Cargando...</div> : (
         <div style={{ overflowX: "auto" }}>
           <table className="ptable">
             <thead><tr>{["Tipo Bomba","Propiedad","Ubicación","Serie","Tag","% Insp.","% Rep.","Comentario","F.Ini.Insp","F.Fin.Insp","F.Ini.Mant","F.Fin.Mant","F.Salida","Responsable","Condición","Archivo","Acciones"].map(h => <th key={h}>{h}</th>)}</tr></thead>
             <tbody>
-              {items.length === 0 ? <tr><td colSpan={17} style={{ textAlign: "center", color: "#334155", padding: 24 }}>Sin registros aún.</td></tr> :
+              {items.length === 0 ? <tr><td colSpan={17} style={{ textAlign: "center", color: "#cbd5e1", padding: 24, fontWeight: 600}}>Sin registros aún.</td></tr> :
               items.map(item => (
                 <tr key={item.id}>
                   <td style={{ color: "#94a3b8" }}>{item.tipo_bomba}</td>
@@ -2474,7 +2474,7 @@ function TallerPage() {
                       <div style={{ background: "#111c30", borderRadius: 99, height: 6, width: 50, overflow: "hidden" }}>
                         <div style={{ height: "100%", background: item.avance_inspeccion >= 100 ? "#34d399" : "#3b82f6", width: item.avance_inspeccion + "%" }} />
                       </div>
-                      <span style={{ fontSize: 11, color: "#64748b" }}>{item.avance_inspeccion}%</span>
+                      <span style={{ fontSize: 11, color: "#cbd5e1", fontWeight: 600}}>{item.avance_inspeccion}%</span>
                     </div>
                   </td>
                   <td>
@@ -2482,18 +2482,18 @@ function TallerPage() {
                       <div style={{ background: "#111c30", borderRadius: 99, height: 6, width: 50, overflow: "hidden" }}>
                         <div style={{ height: "100%", background: item.avance_reparacion >= 100 ? "#34d399" : "#f97316", width: item.avance_reparacion + "%" }} />
                       </div>
-                      <span style={{ fontSize: 11, color: "#64748b" }}>{item.avance_reparacion}%</span>
+                      <span style={{ fontSize: 11, color: "#cbd5e1", fontWeight: 600}}>{item.avance_reparacion}%</span>
                     </div>
                   </td>
                   <td style={{ color: "#94a3b8", fontSize: 11 }}>{item.comentario}</td>
-                  <td style={{ color: "#475569", fontSize: 11 }}>{item.fecha_inicio_inspeccion}</td>
-                  <td style={{ color: "#475569", fontSize: 11 }}>{item.fecha_final_inspeccion}</td>
-                  <td style={{ color: "#475569", fontSize: 11 }}>{item.fecha_inicio_mantto}</td>
-                  <td style={{ color: "#475569", fontSize: 11 }}>{item.fecha_final_mantto}</td>
-                  <td style={{ color: "#475569", fontSize: 11 }}>{item.fecha_salida}</td>
+                  <td style={{ color: "#cbd5e1", fontSize: 11, fontWeight: 600}}>{item.fecha_inicio_inspeccion}</td>
+                  <td style={{ color: "#cbd5e1", fontSize: 11, fontWeight: 600}}>{item.fecha_final_inspeccion}</td>
+                  <td style={{ color: "#cbd5e1", fontSize: 11, fontWeight: 600}}>{item.fecha_inicio_mantto}</td>
+                  <td style={{ color: "#cbd5e1", fontSize: 11, fontWeight: 600}}>{item.fecha_final_mantto}</td>
+                  <td style={{ color: "#cbd5e1", fontSize: 11, fontWeight: 600}}>{item.fecha_salida}</td>
                   <td style={{ color: "#cbd5e1" }}>{item.responsable_salida}</td>
                   <td style={{ color: "#94a3b8" }}>{item.condicion}</td>
-                  <td>{item.archivo_url ? <a href={item.archivo_url} target="_blank" rel="noreferrer" style={{ color: "#34d399", fontSize: 11 }}>📎 Ver</a> : <span style={{ color: "#334155", fontSize: 11 }}>—</span>}</td>
+                  <td>{item.archivo_url ? <a href={item.archivo_url} target="_blank" rel="noreferrer" style={{ color: "#34d399", fontSize: 11 }}>📎 Ver</a> : <span style={{ color: "#cbd5e1", fontSize: 11, fontWeight: 600}}>—</span>}</td>
                   <td style={{ display: "flex", gap: 5 }}>
                     <button className="btn" onClick={() => { setForm({ tipo_bomba: item.tipo_bomba||"", propiedad: item.propiedad||"", ubicacion_actual: item.ubicacion_actual||"", serie: item.serie||"", tag: item.tag||"", avance_inspeccion: item.avance_inspeccion||0, avance_reparacion: item.avance_reparacion||0, comentario: item.comentario||"", fecha_inicio_inspeccion: item.fecha_inicio_inspeccion||"", fecha_final_inspeccion: item.fecha_final_inspeccion||"", fecha_inicio_mantto: item.fecha_inicio_mantto||"", fecha_final_mantto: item.fecha_final_mantto||"", fecha_salida: item.fecha_salida||"", responsable_salida: item.responsable_salida||"", condicion: item.condicion||"", archivo_url: item.archivo_url||"" }); setEditId(item.id); setShowForm(true); }} style={{ background: "#0f2040", color: "#60a5fa", padding: "3px 9px", fontSize: 11 }}>✏️</button>
                     <button className="btn" onClick={() => del(item.id)} style={{ background: "#3b0f0f", color: "#f87171", padding: "3px 9px", fontSize: 11 }}>🗑️</button>
@@ -2632,7 +2632,7 @@ function MegadoPage({ equipment }) {
           {numF("Voltaje (V)", "voltaje_v")}
           {numF("Tiempo (min)", "tiempo_prueba_min")}
         </div>
-        <div style={{ fontSize: 11, color: "#475569", marginTop: 8 }}>PI y DAR se calculan solos con las lecturas; si escribes un valor, se guarda el tuyo.</div>
+        <div style={{ fontSize: 11, color: "#cbd5e1", marginTop: 8, fontWeight: 600}}>PI y DAR se calculan solos con las lecturas; si escribes un valor, se guarda el tuyo.</div>
       </div>
 
       <div className="card" style={{ marginBottom: 14 }}>
@@ -2645,7 +2645,7 @@ function MegadoPage({ equipment }) {
         <button className="btn" onClick={save} disabled={saving || !hasData} style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "9px 22px", fontSize: 13 }}>
           {saving ? "Guardando..." : "Guardar registro"}
         </button>
-        <button className="btn" onClick={() => { setF(emptyForm()); setMsg(null); }} disabled={saving} style={{ background: "#111c30", color: "#64748b", padding: "9px 16px", fontSize: 13 }}>Limpiar</button>
+        <button className="btn" onClick={() => { setF(emptyForm()); setMsg(null); }} disabled={saving} style={{ background: "#111c30", color: "#cbd5e1", padding: "9px 16px", fontSize: 13, fontWeight: 600}}>Limpiar</button>
         {msg && <span style={{ fontSize: 12.5, color: msg.ok ? "#34d399" : "#f87171" }}>{msg.t}</span>}
       </div>
     </div>
@@ -2721,12 +2721,12 @@ function MegadoHistorialPage({ equipment, canDelete }) {
   const mchart = (titulo, unidad, series) => (
     <div className="card" key={titulo}>
       <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 12, color: "#f1f5f9", marginBottom: 2 }}>{titulo}</div>
-      <div style={{ fontSize: 10, color: "#475569", marginBottom: 8 }}>{unidad}</div>
+      <div style={{ fontSize: 10, color: "#cbd5e1", marginBottom: 8, fontWeight: 600}}>{unidad}</div>
       <ResponsiveContainer width="100%" height={200}>
         <LineChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" stroke="#111c30" />
-          <XAxis dataKey="fecha" stroke="#334155" fontSize={9} tick={{ fill: "#475569" }} />
-          <YAxis stroke="#334155" fontSize={9} tick={{ fill: "#475569" }} width={40} />
+          <XAxis dataKey="fecha" stroke="#334155" fontSize={9} tick={{ fill: "#cbd5e1" }} />
+          <YAxis stroke="#334155" fontSize={9} tick={{ fill: "#cbd5e1" }} width={40} />
           <Tooltip contentStyle={ttip} />
           <Legend wrapperStyle={{ fontSize: 11 }} />
           {series.map(([k, c]) => <Line key={k} type="monotone" dataKey={k} stroke={c} strokeWidth={2} dot={{ fill: c, r: 3 }} connectNulls />)}
@@ -2737,7 +2737,7 @@ function MegadoHistorialPage({ equipment, canDelete }) {
 
   const cell = (l, v) => (
     <div key={l}>
-      <div style={{ fontSize: 10, color: "#334155", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 2 }}>{l}</div>
+      <div style={{ fontSize: 10, color: "#cbd5e1", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 2, fontWeight: 600}}>{l}</div>
       <div style={{ fontSize: 13, color: "#cbd5e1", wordBreak: "break-word" }}>{v === null || v === undefined || v === "" ? "—" : v}</div>
     </div>
   );
@@ -2760,7 +2760,7 @@ function MegadoHistorialPage({ equipment, canDelete }) {
           </Lbl>
           <Lbl l="Desde"><input className="inp" type="date" value={fDesde} onChange={e => setFDesde(e.target.value)} /></Lbl>
           <Lbl l="Hasta"><input className="inp" type="date" value={fHasta} onChange={e => setFHasta(e.target.value)} /></Lbl>
-          <button className="btn" onClick={() => { setFTag(""); setFDesde(""); setFHasta(""); }} style={{ background: "#111c30", color: "#64748b", padding: "9px 14px", fontSize: 13 }}>Limpiar filtros</button>
+          <button className="btn" onClick={() => { setFTag(""); setFDesde(""); setFHasta(""); }} style={{ background: "#111c30", color: "#cbd5e1", padding: "9px 14px", fontSize: 13, fontWeight: 600}}>Limpiar filtros</button>
         </div>
       </div>
 
@@ -2771,7 +2771,7 @@ function MegadoHistorialPage({ equipment, canDelete }) {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 10, marginBottom: 14 }}>
             {kpis.map(k => (
               <div key={k.l} className="card">
-                <div style={{ fontSize: 10, color: "#475569", marginBottom: 4 }}>{k.l}</div>
+                <div style={{ fontSize: 10, color: "#cbd5e1", marginBottom: 4, fontWeight: 600}}>{k.l}</div>
                 <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 800, fontSize: 22, color: k.c }}>{k.v}</div>
               </div>
             ))}
@@ -2786,11 +2786,11 @@ function MegadoHistorialPage({ equipment, canDelete }) {
               </div>
             )
           ) : (
-            <div className="card" style={{ marginBottom: 14, textAlign: "center", color: "#475569", fontSize: 12.5 }}>Selecciona un TAG para ver los gráficos de tendencia.</div>
+            <div className="card" style={{ marginBottom: 14, textAlign: "center", color: "#cbd5e1", fontSize: 12.5, fontWeight: 600}}>Selecciona un TAG para ver los gráficos de tendencia.</div>
           )}
 
           {filtered.length === 0 ? (
-            <div className="card" style={{ textAlign: "center", color: "#475569", padding: 30 }}>No hay registros de megado con estos filtros.</div>
+            <div className="card" style={{ textAlign: "center", color: "#cbd5e1", padding: 30, fontWeight: 600}}>No hay registros de megado con estos filtros.</div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {filtered.map(r => (
@@ -2798,7 +2798,7 @@ function MegadoHistorialPage({ equipment, canDelete }) {
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <span style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 14, color: "#60a5fa" }}>{r.tag || "Sin TAG"}</span>
-                      <span style={{ fontSize: 12, color: "#64748b" }}>{megadoFecha(r.fecha)}</span>
+                      <span style={{ fontSize: 12, color: "#cbd5e1", fontWeight: 600}}>{megadoFecha(r.fecha)}</span>
                     </div>
                     {canDelete && <button className="btn" onClick={() => del(r.id)} style={{ background: "#111c30", color: "#f87171", padding: "4px 10px", fontSize: 12 }}>🗑</button>}
                   </div>
@@ -2951,7 +2951,7 @@ export default function App() {
         <div style={{ padding: "8px 6px", borderTop: "1px solid #111c30" }}>
           {sideOpen && <div style={{ padding: "6px 10px", marginBottom: 4 }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: "#f1f5f9" }}>{user.name}</div>
-            <div style={{ fontSize: 10, color: "#475569" }}>{isAdmin ? "Administrador" : `Técnico · ${user.discipline}`}</div>
+            <div style={{ fontSize: 10, color: "#cbd5e1", fontWeight: 600}}>{isAdmin ? "Administrador" : `Técnico · ${user.discipline}`}</div>
           </div>}
           <div className="nav" onClick={() => setUser(null)}><span style={{ flexShrink: 0 }}>🚪</span>{sideOpen && <span>Salir</span>}</div>
           <div className="nav" onClick={() => setSideOpen(p => !p)}><span style={{ flexShrink: 0 }}>{sideOpen ? "◀" : "▶"}</span>{sideOpen && <span>Colapsar</span>}</div>
@@ -2986,7 +2986,7 @@ export default function App() {
                     onMouseLeave={e => e.currentTarget.style.transform = "none"}>
                     <div style={{ fontSize: 18, marginBottom: 5 }}>{s.i}</div>
                     <div style={{ fontFamily: "Syne,sans-serif", fontSize: 24, fontWeight: 800, color: s.c }}>{s.v}</div>
-                    <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>{s.l}</div>
+                    <div style={{ fontSize: 11, color: "#cbd5e1", marginTop: 2, fontWeight: 600}}>{s.l}</div>
                   </div>
                 ))}
               </div>
@@ -2996,12 +2996,12 @@ export default function App() {
                     <div key={d} className="row card" onClick={() => { setFilterOTDisc(d); handlePageChange("ots"); }} style={{ borderLeft: `3px solid ${D_COLOR[d]}` }}>
                       <div style={{ fontSize: 20, marginBottom: 6 }}>{D_ICON[d]}</div>
                       <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 13, color: "#f1f5f9" }}>{d}</div>
-                      <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>{myOTs.filter(o => o.discipline === d).length} OTs · {DEFAULT_PARAMS[d].length} params/OT</div>
+                      <div style={{ fontSize: 11, color: "#cbd5e1", marginTop: 2, fontWeight: 600}}>{myOTs.filter(o => o.discipline === d).length} OTs · {DEFAULT_PARAMS[d].length} params/OT</div>
                     </div>
                   ))}
                 </div>
               )}
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#334155", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Órdenes Recientes</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "#cbd5e1", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Órdenes Recientes</div>
               {myOTs.slice(0, 5).map(ot => <OTRow key={ot.id} ot={ot} equipment={equipment} onClick={() => { setSelOT(ot); setModal("otDetail"); }} />)}
             </div>
           )}
@@ -3014,7 +3014,7 @@ export default function App() {
                   <>
                     <span style={{ fontSize: 13, color: D_COLOR[filterOTDisc], fontWeight: 600 }}>{D_ICON[filterOTDisc]} Filtrando: {filterOTDisc}</span>
                     <button className="btn" onClick={() => setFilterOTDisc("")} style={{ background: "#3b0f0f", color: "#f87171", padding: "3px 10px", fontSize: 11 }}>✕ Limpiar</button>
-                    <span style={{ fontSize: 11, color: "#475569" }}>{myOTs.length} de {myOTsAll.length} OTs</span>
+                    <span style={{ fontSize: 11, color: "#cbd5e1", fontWeight: 600}}>{myOTs.length} de {myOTsAll.length} OTs</span>
                   </>
                 )}
                 {isAdmin && myOTs.length > 0 && (
@@ -3042,7 +3042,7 @@ export default function App() {
                   </>
                 )}
               </div>
-              {myOTs.length === 0 ? <div style={{ textAlign: "center", color: "#334155", padding: 40 }}>No hay órdenes. {isAdmin && "Crea la primera con '+ Nueva OT'."}</div>
+              {myOTs.length === 0 ? <div style={{ textAlign: "center", color: "#cbd5e1", padding: 40, fontWeight: 600}}>No hay órdenes. {isAdmin && "Crea la primera con '+ Nueva OT'."}</div>
                 : myOTs.map(ot => (
                   <div key={ot.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     {isAdmin && (
@@ -3133,7 +3133,7 @@ export default function App() {
             <div className="fd" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               {isAdmin && (
                 <div className="card">
-                  <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 13, color: "#64748b", marginBottom: 14 }}>OTs por Disciplina y Estado</div>
+                  <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 13, color: "#cbd5e1", marginBottom: 14 }}>OTs por Disciplina y Estado</div>
                   <ResponsiveContainer width="100%" height={200}>
                     <BarChart data={kpiData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#111c30" />
@@ -3149,7 +3149,7 @@ export default function App() {
                 </div>
               )}
               <div className="card">
-                <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 13, color: "#64748b", marginBottom: 12 }}>📋 Historial Completo de Lecturas</div>
+                <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 13, color: "#cbd5e1", marginBottom: 12 }}>📋 Historial Completo de Lecturas</div>
                 <div style={{ overflowX: "auto" }}>
                   <table className="ptable">
                     <thead><tr>{["OT","Disciplina","Parámetro","Valor","Fecha"].map(h => <th key={h}>{h}</th>)}</tr></thead>
@@ -3160,7 +3160,7 @@ export default function App() {
                           <td><span style={{ color: D_COLOR[r.work_orders?.discipline], fontSize: 13 }}>{D_ICON[r.work_orders?.discipline]}</span></td>
                           <td style={{ color: "#cbd5e1" }}>{r.parameters?.name}</td>
                           <td style={{ color: "#34d399", fontWeight: 700 }}>{r.value} {r.parameters?.unit}</td>
-                          <td style={{ color: "#64748b", fontSize: 11 }}>{new Date(r.created_at).toLocaleDateString("es-CO")}</td>
+                          <td style={{ color: "#cbd5e1", fontSize: 11, fontWeight: 600}}>{new Date(r.created_at).toLocaleDateString("es-CO")}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -3233,7 +3233,7 @@ export default function App() {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
                   <div>
                     <div style={{ fontFamily: "Syne,sans-serif", fontSize: 15, fontWeight: 700, color: "#f1f5f9" }}>Verificación de Información Ingresada</div>
-                    <div style={{ fontSize: 12, color: "#64748b", marginTop: 3 }}>{otList.length} OTs con lecturas · {allReadings.length} lecturas totales</div>
+                    <div style={{ fontSize: 12, color: "#cbd5e1", marginTop: 3, fontWeight: 600}}>{otList.length} OTs con lecturas · {allReadings.length} lecturas totales</div>
                   </div>
                   <button className="btn" onClick={async () => {
                     const XLSX = window.XLSX;
@@ -3339,7 +3339,7 @@ export default function App() {
                 </div>
 
                 {otList.length === 0 ? (
-                  <div style={{ textAlign: "center", color: "#334155", padding: 40 }}>No hay lecturas registradas aún. Los técnicos deben cerrar sus OTs para que aparezcan aquí.</div>
+                  <div style={{ textAlign: "center", color: "#cbd5e1", padding: 40, fontWeight: 600}}>No hay lecturas registradas aún. Los técnicos deben cerrar sus OTs para que aparezcan aquí.</div>
                 ) : otList.map(([otId, g]) => (
                   <div key={otId} className="card" style={{ marginBottom: 14 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
@@ -3355,11 +3355,11 @@ export default function App() {
                       <div>
                         <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4 }}>
                           <span style={{ fontFamily: "Syne,sans-serif", fontSize: 12, color: "#3b82f6", fontWeight: 700 }}>{otId}</span>
-                          <span className="tag" style={{ background: "#111c30", color: D_COLOR[g.disc] || "#64748b", fontSize: 10 }}>{D_ICON[g.disc] || ""} {g.disc}</span>
+                          <span className="tag" style={{ background: "#111c30", color: D_COLOR[g.disc] || "#cbd5e1", fontSize: 10, fontWeight: 600}}>{D_ICON[g.disc] || ""} {g.disc}</span>
                           {g.status === "Cerrada" && <span className="tag" style={{ background: "#2a1e3a", color: "#a78bfa", fontSize: 10 }}>✅ Cerrada</span>}
                         </div>
                         <div style={{ fontSize: 13, fontWeight: 600, color: "#f1f5f9" }}>{g.title}</div>
-                        <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>{g.readings.length} lecturas registradas</div>
+                        <div style={{ fontSize: 11, color: "#cbd5e1", marginTop: 2, fontWeight: 600}}>{g.readings.length} lecturas registradas</div>
                       </div>
                       </div>
                       <div style={{ display: "flex", gap: 8 }}>
@@ -3384,9 +3384,9 @@ export default function App() {
                           {g.readings.map((r, i) => (
                             <tr key={i}>
                               <td style={{ color: "#cbd5e1", fontWeight: 500 }}>{r.parameters?.name || "—"}</td>
-                              <td style={{ color: "#64748b" }}>{r.parameters?.unit || "—"}</td>
+                              <td style={{ color: "#cbd5e1", fontWeight: 600}}>{r.parameters?.unit || "—"}</td>
                               <td style={{ color: "#34d399", fontWeight: 700 }}>{r.value}</td>
-                              <td style={{ color: "#475569", fontSize: 11 }}>{r.created_at ? new Date(r.created_at).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" }) : "—"}</td>
+                              <td style={{ color: "#cbd5e1", fontSize: 11, fontWeight: 600}}>{r.created_at ? new Date(r.created_at).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" }) : "—"}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -3413,13 +3413,13 @@ export default function App() {
                     {u.role === "admin" ? "👨‍💼" : "👷"}
                   </div>
                   <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 13, color: "#f1f5f9" }}>{u.name}</div>
-                  <div style={{ fontSize: 11, color: "#475569", marginTop: 3 }}>{u.email}</div>
+                  <div style={{ fontSize: 11, color: "#cbd5e1", marginTop: 3, fontWeight: 600}}>{u.email}</div>
                   <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 5 }}>
                     <span className="tag" style={{ background: u.role === "admin" ? "#1e1e3a" : "#1e3a2a", color: u.role === "admin" ? "#a78bfa" : "#34d399" }}>
                       {u.role === "admin" ? (u.full_access ? "Admin · Acceso Total" : "Admin · Módulos limitados") : "Técnico · " + u.discipline}
                     </span>
                     {u.role === "admin" && !u.full_access && (u.modulos || []).length > 0 && (
-                      <div style={{ fontSize: 10, color: "#475569", lineHeight: 1.5 }}>
+                      <div style={{ fontSize: 10, color: "#cbd5e1", lineHeight: 1.5, fontWeight: 600}}>
                         {(u.modulos || []).map(m => {
                           const mod = ALL_MODULOS.find(x => x.k === m);
                           return mod ? <span key={m} style={{ display: "inline-block", background: "#0d1b2e", color: "#60a5fa", borderRadius: 4, padding: "1px 6px", marginRight: 3, marginBottom: 2 }}>{mod.l}</span> : null;
