@@ -109,7 +109,17 @@ const db = {
   async getParams(otId) { const { data } = await supabase.from("parameters").select("*").eq("ot_id", otId).order("sort_order"); return data || []; },
   async getReadings(otId) { const { data } = await supabase.from("readings").select("*, parameters(name, unit, sort_order)").eq("ot_id", otId).order("created_at"); return data || []; },
   async getComments(otId) { const { data } = await supabase.from("comments").select("*").eq("ot_id", otId).order("created_at"); return data || []; },
-  async getAllReadings() { const { data } = await supabase.from("readings").select("*, parameters(name, unit, sort_order), work_orders(id, discipline, title, status, description, equipment_id)").order("created_at", { ascending: false }).limit(50000); return data || []; },
+  async getAllReadings() {
+    // El API de Supabase limita cada consulta (normalmente 1000 filas): se pide por páginas hasta traer todo.
+    const PAGE = 1000, MAX = 50000; let all = [];
+    for (let from = 0; from < MAX; from += PAGE) {
+      const { data, error } = await supabase.from("readings").select("*, parameters(name, unit, sort_order), work_orders(id, discipline, title, status, description, equipment_id)").order("created_at", { ascending: false }).order("id", { ascending: false }).range(from, from + PAGE - 1);
+      if (error) { console.error("getAllReadings error:", error); break; }
+      all = all.concat(data || []);
+      if (!data || data.length < PAGE) break;
+    }
+    return all;
+  },
   async createLocation(loc) { const { data } = await supabase.from("locations").insert(loc).select().single(); return data; },
   async createEquipment(eq) { const { data } = await supabase.from("equipment").insert(eq).select().single(); return data; },
   async createJI(ji) { const { data } = await supabase.from("job_instructions").insert(ji).select().single(); return data; },
@@ -1224,7 +1234,8 @@ const INST_PARAMS = [
 
 function ParamChart({ paramName, unit, color, allReadings }) {
   const data = allReadings
-    .filter(r => r.parameters && r.parameters.name === paramName)
+    .filter(r => r.parameters && (r.parameters.name === paramName || r.parameters.name === paramName.replace("(V): ", "")))
+    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
     .map(r => ({ fecha: new Date(r.created_at).toLocaleDateString("es-CO"), valor: parseFloat(r.value) || 0 }))
     .slice(-15);
   return (
@@ -1525,7 +1536,7 @@ function DashboardOperativo({ allReadings, equipment, onRefresh }) {
           });
 
           const getLastVal = (paramName) => {
-            const r = tagReadings.filter(x => x.parameters?.name === paramName).slice(-1)[0];
+            const r = tagReadings.filter(x => x.parameters?.name === paramName)[0];
             return r ? parseFloat(r.value) : null;
           };
 
@@ -3154,7 +3165,7 @@ export default function App() {
                   <table className="ptable">
                     <thead><tr>{["OT","Disciplina","Parámetro","Valor","Fecha"].map(h => <th key={h}>{h}</th>)}</tr></thead>
                     <tbody>
-                      {allReadings.slice(-30).reverse().map((r, i) => (
+                      {allReadings.slice(0, 30).map((r, i) => (
                         <tr key={i}>
                           <td style={{ color: "#3b82f6", fontFamily: "Syne,sans-serif", fontSize: 11 }}>{r.ot_id}</td>
                           <td><span style={{ color: D_COLOR[r.work_orders?.discipline], fontSize: 13 }}>{D_ICON[r.work_orders?.discipline]}</span></td>
