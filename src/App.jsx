@@ -1394,17 +1394,49 @@ function DashboardOperativo({ allReadings, equipment, onRefresh }) {
   // Build filter options from data
   const fechas = useMemo(() => [...new Set(allReadings.map(r => r.created_at ? new Date(r.created_at).toLocaleDateString("es-CO") : "").filter(Boolean))].sort().reverse(), [allReadings]);
 
-  // Cascading filters from equipment table
-  const areas = [...new Set(equipment.map(e => e.area).filter(Boolean))].sort();
-  const tags = [...new Set(
-    equipment.filter(e => !filterArea || e.area === filterArea).map(e => e.code).filter(Boolean)
-  )].sort();
-  const subareas = [...new Set(
-    equipment
-      .filter(e => !filterArea || e.area === filterArea)
-      .filter(e => !filterTag || e.code === filterTag)
-      .map(e => e.subarea).filter(Boolean)
-  )].sort();
+  // Equipos por código: completan Área/Subárea cuando la descripción de la OT no las trae (ej. datos importados)
+  const eqByCode = useMemo(() => {
+    const m = new Map();
+    equipment.forEach(e => { if (e.code) m.set(e.code.trim().toUpperCase(), e); });
+    return m;
+  }, [equipment]);
+  const sameText = (x, y) => (x || "").trim().toUpperCase() === (y || "").trim().toUpperCase();
+  const uniqSorted = (arr) => {
+    const m = new Map();
+    arr.forEach(v => { const t = (v || "").trim(); if (t && !m.has(t.toUpperCase())) m.set(t.toUpperCase(), t); });
+    return [...m.values()].sort();
+  };
+
+  // Catálogo TAG / Área / Subárea: tabla de equipos + lecturas reales (así también aparecen los TAG históricos)
+  const catalog = useMemo(() => {
+    const seen = new Map();
+    const add = (tag, area, subarea) => {
+      const t = (tag || "").trim().toUpperCase();
+      const ar = (area || "").trim();
+      const sa = (subarea || "").trim();
+      if (!t) return;
+      const k = t + "|" + ar.toUpperCase() + "|" + sa.toUpperCase();
+      if (!seen.has(k)) seen.set(k, { tag: t, area: ar, subarea: sa });
+    };
+    equipment.forEach(e => add(e.code, e.area, e.subarea));
+    allReadings.forEach(r => {
+      const parts = (r.work_orders?.description || "").split("|");
+      const t = (parts[0] || "").trim().toUpperCase();
+      const eq = eqByCode.get(t);
+      add(t, parts[1]?.trim() || eq?.area, parts[2]?.trim() || eq?.subarea);
+    });
+    return [...seen.values()];
+  }, [equipment, allReadings, eqByCode]);
+
+  // Listas en cascada: Área → TAG / Equipo → Sub-área
+  const areas = useMemo(() => uniqSorted(catalog.map(c => c.area)), [catalog]);
+  const tags = uniqSorted(catalog.filter(c => !filterArea || sameText(c.area, filterArea)).map(c => c.tag));
+  const subareas = uniqSorted(
+    catalog
+      .filter(c => !filterArea || sameText(c.area, filterArea))
+      .filter(c => !filterTag || c.tag === filterTag)
+      .map(c => c.subarea)
+  );
 
   // Helper: extract TAG from OT description
   // Formats: "PPZ402|AREA|SUBAREA|DESC" or "Tag: PPZ402 | DESC"
@@ -1441,14 +1473,6 @@ function DashboardOperativo({ allReadings, equipment, onRefresh }) {
 
   // Build tag/area/subarea lists from ALL readings (not just equipment table)
   // This ensures historical data appears in filters even without equipment record
-
-  // Equipos por código: completan Área/Subárea cuando la descripción de la OT no las trae (ej. datos importados)
-  const eqByCode = useMemo(() => {
-    const m = new Map();
-    equipment.forEach(e => { if (e.code) m.set(e.code.trim().toUpperCase(), e); });
-    return m;
-  }, [equipment]);
-  const sameText = (x, y) => (x || "").trim().toUpperCase() === (y || "").trim().toUpperCase();
 
   // Filter readings
   const filtered = useMemo(() => allReadings.filter(r => {
@@ -1967,7 +1991,12 @@ function ImportHistorico({ equipment }) {
         for (const [disc, params] of Object.entries(discGroups)) {
           const suffix = disc === "Mecánico" ? "" : disc === "Eléctrico" ? "-E" : "-I";
           const otId = otNum + suffix;
-          if (!otMap[otId]) otMap[otId] = { disc, tag, fecha, eq_id: eq?.id || null, params: {} };
+          if (!otMap[otId]) otMap[otId] = {
+            disc, tag, fecha, eq_id: eq?.id || null, params: {},
+            // Área y Subárea del Excel (columnas A y B); si faltan, las del equipo registrado
+            area: (String(row[0] || "").trim() || eq?.area || "").replace(/\|/g, " "),
+            subarea: (String(row[1] || "").trim() || eq?.subarea || "").replace(/\|/g, " "),
+          };
           for (const p of params) otMap[otId].params[p.name] = { unit: p.unit, value: p.value };
         }
       }
