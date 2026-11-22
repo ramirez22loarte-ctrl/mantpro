@@ -110,13 +110,32 @@ const db = {
   async getReadings(otId) { const { data } = await supabase.from("readings").select("*, parameters(name, unit, sort_order)").eq("ot_id", otId).order("created_at"); return data || []; },
   async getComments(otId) { const { data } = await supabase.from("comments").select("*").eq("ot_id", otId).order("created_at"); return data || []; },
   async getAllReadings() {
-    // El API de Supabase limita cada consulta (normalmente 1000 filas): se pide por páginas hasta traer todo.
-    const PAGE = 1000, MAX = 50000; let all = [];
-    for (let from = 0; from < MAX; from += PAGE) {
-      const { data, error } = await supabase.from("readings").select("*, parameters(name, unit, sort_order), work_orders(id, discipline, title, status, description, equipment_id)").order("created_at", { ascending: false }).order("id", { ascending: false }).range(from, from + PAGE - 1);
-      if (error) { console.error("getAllReadings error:", error); break; }
-      all = all.concat(data || []);
-      if (!data || data.length < PAGE) break;
+    // Supabase limita cada consulta (normalmente 1000 filas): se piden páginas, varias a la vez, hasta traer todo.
+    const PAGE = 1000, MAX = 50000, PARALLEL = 6;
+    const SEL = "*, parameters(name, unit, sort_order), work_orders(id, discipline, title, status, description, equipment_id)";
+    const page = (from, opts) => supabase.from("readings").select(SEL, opts).order("created_at", { ascending: false }).order("id", { ascending: false }).range(from, from + PAGE - 1);
+    const first = await page(0, { count: "exact" });
+    if (first.error) { console.error("getAllReadings error:", first.error); return []; }
+    let all = first.data || [];
+    if (all.length < PAGE) return all;
+    if (first.count == null) {
+      // sin conteo disponible: páginas una tras otra hasta que una venga incompleta
+      for (let from = PAGE; from < MAX; from += PAGE) {
+        const r = await page(from);
+        if (r.error) { console.error("getAllReadings error:", r.error); break; }
+        all = all.concat(r.data || []);
+        if (!r.data || r.data.length < PAGE) break;
+      }
+      return all;
+    }
+    const starts = [];
+    for (let f = PAGE; f < Math.min(first.count, MAX); f += PAGE) starts.push(f);
+    for (let k = 0; k < starts.length; k += PARALLEL) {
+      const res = await Promise.all(starts.slice(k, k + PARALLEL).map(f => page(f)));
+      for (const r of res) {
+        if (r.error) { console.error("getAllReadings error:", r.error); continue; }
+        all = all.concat(r.data || []);
+      }
     }
     return all;
   },
@@ -1370,9 +1389,10 @@ function DashboardOperativo({ allReadings, equipment, onRefresh }) {
   const [filterTag, setFilterTag] = useState("");
   const [filterArea, setFilterArea] = useState("");
   const [filterSubarea, setFilterSubarea] = useState("");
+  const [tableLimit, setTableLimit] = useState(200);
 
   // Build filter options from data
-  const fechas = [...new Set(allReadings.map(r => r.created_at ? new Date(r.created_at).toLocaleDateString("es-CO") : "").filter(Boolean))].sort().reverse();
+  const fechas = useMemo(() => [...new Set(allReadings.map(r => r.created_at ? new Date(r.created_at).toLocaleDateString("es-CO") : "").filter(Boolean))].sort().reverse(), [allReadings]);
 
   // Cascading filters from equipment table
   const areas = [...new Set(equipment.map(e => e.area).filter(Boolean))].sort();
@@ -1422,29 +1442,48 @@ function DashboardOperativo({ allReadings, equipment, onRefresh }) {
   // Build tag/area/subarea lists from ALL readings (not just equipment table)
   // This ensures historical data appears in filters even without equipment record
 
+  // Equipos por código: completan Área/Subárea cuando la descripción de la OT no las trae (ej. datos importados)
+  const eqByCode = useMemo(() => {
+    const m = new Map();
+    equipment.forEach(e => { if (e.code) m.set(e.code.trim().toUpperCase(), e); });
+    return m;
+  }, [equipment]);
+  const sameText = (x, y) => (x || "").trim().toUpperCase() === (y || "").trim().toUpperCase();
+
   // Filter readings
-  const filtered = allReadings.filter(r => {
+  const filtered = useMemo(() => allReadings.filter(r => {
     const fecha = r.created_at ? new Date(r.created_at).toLocaleDateString("es-CO") : "";
     if (filterFecha && fecha !== filterFecha) return false;
     if (filterTag || filterArea || filterSubarea) {
       const desc = r.work_orders?.description || "";
       const parts = desc.split("|");
       const tag = (parts[0]?.trim() || "").toUpperCase();
-      const area = parts[1]?.trim() || "";
-      const subarea = parts[2]?.trim() || "";
+      const eq = eqByCode.get(tag);
       if (filterTag && tag !== filterTag) return false;
-      if (filterArea && area !== filterArea) return false;
-      if (filterSubarea && subarea !== filterSubarea) return false;
+      if (filterArea && !(sameText(parts[1], filterArea) || sameText(eq?.area, filterArea))) return false;
+      if (filterSubarea && !(sameText(parts[2], filterSubarea) || sameText(eq?.subarea, filterSubarea))) return false;
     }
     return true;
-  });
+  }), [allReadings, filterFecha, filterTag, filterArea, filterSubarea, eqByCode]);
+
+  // Lecturas agrupadas por TAG (una sola pasada)
+  const byTag = useMemo(() => {
+    const m = new Map();
+    filtered.forEach(r => {
+      const tag = (r.work_orders?.description || "").split("|")[0]?.trim().toUpperCase();
+      if (!tag) return;
+      if (!m.has(tag)) m.set(tag, []);
+      m.get(tag).push(r);
+    });
+    return m;
+  }, [filtered]);
 
   const total = filtered.length;
   const mec = filtered.filter(r => r.work_orders?.discipline === "Mecánico").length;
   const elec = filtered.filter(r => r.work_orders?.discipline === "Eléctrico").length;
   const inst = filtered.filter(r => r.work_orders?.discipline === "Instrumentación").length;
 
-  const clearFilters = () => { setFilterFecha(""); setFilterTag(""); setFilterArea(""); setFilterSubarea(""); };
+  const clearFilters = () => { setFilterFecha(""); setFilterTag(""); setFilterArea(""); setFilterSubarea(""); setTableLimit(200); };
   const hasFilters = filterFecha || filterTag || filterArea || filterSubarea;
 
   return (
@@ -1520,38 +1559,35 @@ function DashboardOperativo({ allReadings, equipment, onRefresh }) {
 
       {/* EFICIENCIA POR TAG */}
       {(() => {
-        // Get unique TAGs from filtered readings
-        const tags = [...new Set(filtered.map(r => {
-          const desc = r.work_orders?.description || "";
-          const parts = desc.split("|");
-          return parts[0]?.trim().toUpperCase();
-        }).filter(Boolean))];
+        // TAGs únicos de las lecturas filtradas (agrupadas una sola vez)
+        const tags = [...byTag.keys()];
 
         if (tags.length === 0) return null;
 
         const calcEficiencia = (tag) => {
-          const tagReadings = filtered.filter(r => {
-            const desc = r.work_orders?.description || "";
-            return desc.split("|")[0]?.trim().toUpperCase() === tag;
-          });
+          const tagReadings = byTag.get(tag) || [];
 
-          const getLastVal = (paramName) => {
-            const r = tagReadings.filter(x => x.parameters?.name === paramName)[0];
-            return r ? parseFloat(r.value) : null;
-          };
-
-          const caudal = getLastVal("Caudal");       // L/s
-          const presion = getLastVal("Presión");     // PSI
-          const potencia = getLastVal("Potencia");   // kW
-
-          if (!caudal || !presion || !potencia || potencia === 0) return null;
-
-          const Q = caudal / 1000;                   // m³/s
-          const P = presion * 0.704;                 // mca
-          const PB_W = 9807 * Q * P;                // W
-          const PB_HP = (PB_W / 1000) * 1.34102;   // HP
-          const POT_HP = potencia * 1.34102;         // HP
-          return (PB_HP / POT_HP) * 100;
+          // Eficiencia de la ÚLTIMA fecha que tenga Caudal, Presión y Potencia (los tres de la misma fecha)
+          const fechasTag = [...new Set(tagReadings.map(r => r.created_at ? r.created_at.split("T")[0] : null).filter(Boolean))].sort().reverse();
+          for (const fecha of fechasTag) {
+            const delDia = tagReadings.filter(r => r.created_at && r.created_at.split("T")[0] === fecha);
+            const getVal = (paramName) => {
+              const r = delDia.filter(x => x.parameters?.name === paramName)[0];
+              return r ? parseFloat(r.value) : null;
+            };
+            const caudal = getVal("Caudal");       // L/s
+            const presion = getVal("Presión");     // PSI
+            const potencia = getVal("Potencia");   // kW
+            if (caudal && presion && potencia && potencia > 0) {
+              const Q = caudal / 1000;                   // m³/s
+              const P = presion * 0.704;                 // mca
+              const PB_W = 9807 * Q * P;                // W
+              const PB_HP = (PB_W / 1000) * 1.34102;   // HP
+              const POT_HP = potencia * 1.34102;         // HP
+              return (PB_HP / POT_HP) * 100;
+            }
+          }
+          return null;
         };
 
         return (
@@ -1599,32 +1635,48 @@ function DashboardOperativo({ allReadings, equipment, onRefresh }) {
 
       {/* GRÁFICO DE EFICIENCIA */}
       {(() => {
-        const tags = [...new Set(filtered.map(r => {
-          const desc = r.work_orders?.description || "";
-          return desc.split("|")[0]?.trim().toUpperCase();
-        }).filter(Boolean))];
+        const tags = [...byTag.keys()];
 
         if (tags.length === 0) return null;
 
-        // Build chart data: group by fecha, calc efficiency per tag
-        const fechas = [...new Set(filtered.map(r => r.created_at ? r.created_at.split("T")[0] : null).filter(Boolean))].sort();
+        // Con muchos equipos el gráfico es ilegible y lento: se pide filtrar antes
+        if (tags.length > 12) {
+          return (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "#34d399", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+                📈 Historial de Eficiencia ηT (%) <div style={{ flex: 1, height: 1, background: "#1a2740" }} />
+              </div>
+              <div className="card" style={{ textAlign: "center", color: "#cbd5e1", fontSize: 12.5, fontWeight: 600 }}>
+                Hay {tags.length} equipos en pantalla. Filtra por Área, Subárea o TAG (máximo 12 equipos) para ver el historial de eficiencia.
+              </div>
+            </div>
+          );
+        }
+
+        // Caudal, Presión y Potencia por TAG y fecha, en una sola pasada (el último de cada día prevalece)
+        const vals = new Map();
+        const fechasSet = new Set();
+        filtered.forEach(r => {
+          const name = r.parameters?.name;
+          if (name !== "Caudal" && name !== "Presión" && name !== "Potencia") return;
+          const tag = (r.work_orders?.description || "").split("|")[0]?.trim().toUpperCase();
+          const fecha = r.created_at ? r.created_at.split("T")[0] : null;
+          if (!tag || !fecha) return;
+          const key = tag + "|" + fecha;
+          let o = vals.get(key);
+          if (!o) { o = {}; vals.set(key, o); }
+          o[name] = parseFloat(r.value);
+          fechasSet.add(fecha);
+        });
+        const fechas = [...fechasSet].sort();
 
         const chartData = fechas.map(fecha => {
           const point = { fecha };
           tags.forEach(tag => {
-            const tagReadings = filtered.filter(r => {
-              const desc = r.work_orders?.description || "";
-              const rTag = desc.split("|")[0]?.trim().toUpperCase();
-              const rFecha = r.created_at ? r.created_at.split("T")[0] : null;
-              return rTag === tag && rFecha === fecha;
-            });
-            const getVal = (name) => {
-              const r = tagReadings.filter(x => x.parameters?.name === name).slice(-1)[0];
-              return r ? parseFloat(r.value) : null;
-            };
-            const caudal = getVal("Caudal");
-            const presion = getVal("Presión");
-            const potencia = getVal("Potencia");
+            const o = vals.get(tag + "|" + fecha) || {};
+            const caudal = o["Caudal"];
+            const presion = o["Presión"];
+            const potencia = o["Potencia"];
             if (caudal && presion && potencia && potencia > 0) {
               const Q = caudal / 1000;
               const P = presion * 0.704;
@@ -1689,7 +1741,7 @@ function DashboardOperativo({ allReadings, equipment, onRefresh }) {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(r => {
+                {filtered.slice(0, tableLimit).map(r => {
                   const desc = r.work_orders?.description || "";
                   const tag = desc.split("|")[0]?.trim().toUpperCase() || "—";
                   return (
@@ -1712,6 +1764,12 @@ function DashboardOperativo({ allReadings, equipment, onRefresh }) {
               </tbody>
             </table>
           </div>
+          {filtered.length > tableLimit && (
+            <div style={{ textAlign: "center", marginTop: 12, fontSize: 12, color: "#cbd5e1", fontWeight: 600 }}>
+              Mostrando {tableLimit} de {filtered.length} lecturas ·{" "}
+              <button className="btn" onClick={() => setTableLimit(n => n + 200)} style={{ background: "#0f2040", color: "#60a5fa", padding: "5px 12px", fontSize: 12 }}>Mostrar 200 más</button>
+            </div>
+          )}
         </div>
       )}
     </div>
