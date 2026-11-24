@@ -3079,6 +3079,7 @@ export default function App() {
   const [vHasta, setVHasta] = useState("");
   const [vArea, setVArea] = useState("");
   const [vTag, setVTag] = useState("");
+  const [vOT, setVOT] = useState("");
   const [vLimit, setVLimit] = useState(50);
   const [editRid, setEditRid] = useState(null);
   const [editVal, setEditVal] = useState("");
@@ -3098,6 +3099,7 @@ export default function App() {
     return [...seen.values()];
   }, [allReadings, verifEqById, verifEqByCode]);
   const verifFiltered = useMemo(() => allReadings.filter(r => {
+    if (vOT.trim() && !String(r.ot_id || "").toUpperCase().includes(vOT.trim().toUpperCase())) return false;
     if (vDesde || vHasta) {
       if (!r.created_at) return false;
       const d = localDay(r.created_at);
@@ -3110,7 +3112,7 @@ export default function App() {
       if (vArea && !areas.some(x => x.toUpperCase() === vArea.trim().toUpperCase())) return false;
     }
     return true;
-  }), [allReadings, vDesde, vHasta, vTag, vArea, verifEqById, verifEqByCode]);
+  }), [allReadings, vOT, vDesde, vHasta, vTag, vArea, verifEqById, verifEqByCode]);
 
   const isAdmin = user?.role === "admin";
   const ro = (k) => isRO(user, k); // administrador con "Solo ver" en el módulo k
@@ -3455,7 +3457,7 @@ export default function App() {
               grouped[r.ot_id].readings.push(r);
             });
             const otList = Object.entries(grouped);
-            const hasV = !!(vDesde || vHasta || vArea || vTag);
+            const hasV = !!(vOT.trim() || vDesde || vHasta || vArea || vTag);
             const roV = ro("verificacion");
             const vAreas = (() => { const m = new Map(); verifCatalog.forEach(c => { const t = c.area.trim(); if (t && !m.has(t.toUpperCase())) m.set(t.toUpperCase(), t); }); return [...m.values()].sort(); })();
             const vTags = [...new Set(verifCatalog.filter(c => !vArea || c.area.trim().toUpperCase() === vArea.trim().toUpperCase()).map(c => c.tag))].sort();
@@ -3640,6 +3642,7 @@ export default function App() {
                 {/* FILTROS */}
                 <div className="card" style={{ marginBottom: 14, padding: "14px 18px" }}>
                   <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
+                    <div style={{ flex: 1, minWidth: 150 }}><Lbl l="N° de OT"><input className="inp" value={vOT} placeholder="Buscar OT..." onChange={e => { setVOT(e.target.value); setVLimit(50); }} /></Lbl></div>
                     <div style={{ flex: 1, minWidth: 150 }}><Lbl l="Fecha desde"><input className="inp" type="date" value={vDesde} onChange={e => { setVDesde(e.target.value); setVLimit(50); }} /></Lbl></div>
                     <div style={{ flex: 1, minWidth: 150 }}><Lbl l="Fecha hasta"><input className="inp" type="date" value={vHasta} onChange={e => { setVHasta(e.target.value); setVLimit(50); }} /></Lbl></div>
                     <div style={{ flex: 1, minWidth: 160 }}>
@@ -3659,7 +3662,7 @@ export default function App() {
                       </Lbl>
                     </div>
                     {hasV && (
-                      <button className="btn" onClick={() => { setVDesde(""); setVHasta(""); setVArea(""); setVTag(""); setVLimit(50); }} style={{ background: "#3b0f0f", color: "#f87171", padding: "8px 14px", fontSize: 12 }}>✕ Limpiar filtros</button>
+                      <button className="btn" onClick={() => { setVOT(""); setVDesde(""); setVHasta(""); setVArea(""); setVTag(""); setVLimit(50); }} style={{ background: "#3b0f0f", color: "#f87171", padding: "8px 14px", fontSize: 12 }}>✕ Limpiar filtros</button>
                     )}
                   </div>
                 </div>
