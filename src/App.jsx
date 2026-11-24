@@ -194,6 +194,111 @@ const ALL_MODULOS = [
   { k: "users", l: "Usuarios" },
 ];
 
+// ── "SOLO VER" POR MÓDULO (administradores sin acceso total) ──
+// Se guarda dentro de user.modulos como "ro:<módulo>" junto al módulo (no requiere cambios en la base de datos).
+const isRO = (u, k) => !!u && u.role === "admin" && !u.full_access && (u.modulos || []).includes("ro:" + k);
+// Módulos donde se puede escribir/eliminar (los demás son solo de consulta y no llevan casilla)
+const WRITE_MODULOS = ["ots", "equipment", "ji", "dashboard_op", "verificacion", "historico", "solped", "avisos", "taller", "megado", "users"];
+
+function ReadOnlyNotice() {
+  return (
+    <div className="card fd" style={{ maxWidth: 520, textAlign: "center", padding: 30 }}>
+      <div style={{ fontSize: 34, marginBottom: 10 }}>👁</div>
+      <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 15, color: "#f1f5f9", marginBottom: 6 }}>Acceso de solo ver</div>
+      <div style={{ fontSize: 13, color: "#cbd5e1", fontWeight: 600 }}>Este módulo sirve para cargar datos y tu usuario tiene permiso de solo ver. Pide a un administrador con acceso total que te habilite la edición.</div>
+    </div>
+  );
+}
+
+// Selector de módulos con casilla "Solo ver" (se usa al crear y al editar usuarios)
+function ModulePerms({ modulos, onChange, available, currentUser }) {
+  const has = (k) => modulos.includes(k);
+  const toggle = (k) => {
+    if (has(k)) onChange(modulos.filter(m => m !== k && m !== "ro:" + k));
+    else onChange([...modulos, k, ...(isRO(currentUser, k) ? ["ro:" + k] : [])]);
+  };
+  const toggleRO = (k) => {
+    if (isRO(currentUser, k)) return; // quien solo ve no puede dar permiso de edición
+    onChange(has("ro:" + k) ? modulos.filter(m => m !== "ro:" + k) : [...modulos, "ro:" + k]);
+  };
+  return (
+    <div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        {available.map(m => (
+          <div key={m.k}>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, color: has(m.k) ? "#60a5fa" : "#cbd5e1", fontWeight: 600 }}>
+              <input type="checkbox" checked={has(m.k)} onChange={() => toggle(m.k)} />
+              {m.l}
+            </label>
+            {has(m.k) && WRITE_MODULOS.includes(m.k) && (
+              <label style={{ display: "flex", alignItems: "center", gap: 5, marginLeft: 22, marginTop: 2, fontSize: 11, cursor: isRO(currentUser, m.k) ? "not-allowed" : "pointer", color: has("ro:" + m.k) ? "#fbbf24" : "#cbd5e1", fontWeight: 600 }}>
+                <input type="checkbox" checked={has("ro:" + m.k)} disabled={isRO(currentUser, m.k)} onChange={() => toggleRO(m.k)} />
+                👁 Solo ver
+              </label>
+            )}
+          </div>
+        ))}
+      </div>
+      <div style={{ fontSize: 10.5, color: "#cbd5e1", marginTop: 10, fontWeight: 600 }}>Sin "Solo ver", el administrador puede crear, editar y eliminar en ese módulo.</div>
+    </div>
+  );
+}
+
+// Modificar el acceso de un usuario existente (solo administradores con acceso total)
+function EditUserAccess({ u, currentUser, onClose, onSave }) {
+  const [f, setF] = useState({ full_access: !!u.full_access, modulos: u.modulos || [], discipline: u.discipline || "Mecánico" });
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+  const submit = async () => {
+    setSaving(true); setErr("");
+    const patch = u.role === "admin"
+      ? { full_access: f.full_access, modulos: f.full_access ? [] : f.modulos }
+      : { discipline: f.discipline };
+    const { data, error } = await supabase.from("users").update(patch).eq("id", u.id).select();
+    setSaving(false);
+    if (error) { console.error("Error al editar acceso:", error); setErr("No se pudo guardar: " + error.message); return; }
+    if (!data || data.length === 0) { setErr("El cambio no se aplicó (revisa los permisos de la tabla users en Supabase)."); return; }
+    onSave({ ...u, ...patch });
+  };
+  return (
+    <div className="ov" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="mod fd" style={{ width: 460 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+          <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 16, color: "#f1f5f9" }}>✏️ Editar acceso</div>
+          <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#cbd5e1", padding: "5px 11px", fontWeight: 600 }}>✕</button>
+        </div>
+        <div style={{ fontSize: 12, color: "#cbd5e1", marginBottom: 16, fontWeight: 600 }}>{u.name} · {u.email}</div>
+        {u.role === "admin" ? (
+          <div style={{ background: "#0d1b2e", border: "1px solid #1e3a5f", borderRadius: 10, padding: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#cbd5e1" }}>PERMISOS DE MÓDULOS</div>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                <input type="checkbox" checked={f.full_access} onChange={e => setF(p => ({ ...p, full_access: e.target.checked }))} />
+                <span style={{ fontSize: 12, color: "#a78bfa", fontWeight: 600 }}>Acceso total</span>
+              </label>
+            </div>
+            {!f.full_access
+              ? <ModulePerms modulos={f.modulos} onChange={v => setF(p => ({ ...p, modulos: v }))} available={ALL_MODULOS} currentUser={currentUser} />
+              : <div style={{ fontSize: 11, color: "#34d399" }}>✅ Este admin tendrá acceso a todos los módulos</div>}
+          </div>
+        ) : (
+          <Lbl l="Disciplina">
+            <select className="inp" value={f.discipline} onChange={e => setF(p => ({ ...p, discipline: e.target.value }))}>
+              {["Mecánico", "Eléctrico", "Instrumentación"].map(d => <option key={d}>{d}</option>)}
+            </select>
+          </Lbl>
+        )}
+        <div style={{ fontSize: 11, color: "#cbd5e1", marginTop: 12, fontWeight: 600 }}>Los cambios se aplican la próxima vez que el usuario inicie sesión.</div>
+        {err && <div style={{ fontSize: 12, color: "#f87171", background: "#3b0f0f", padding: "8px 12px", borderRadius: 7, marginTop: 10 }}>{err}</div>}
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 14 }}>
+          <button className="btn" onClick={onClose} style={{ background: "#111c30", color: "#cbd5e1", padding: "8px 16px", fontSize: 13, fontWeight: 600 }}>Cancelar</button>
+          <button className="btn" onClick={submit} disabled={saving} style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "8px 20px", fontSize: 13 }}>{saving ? "Guardando..." : "Guardar cambios"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── NEW USER MODAL ────────────────────────────────────────────
 function NewUser({ onClose, onSave, currentUser }) {
   const [f, setF] = useState({ name: "", email: "", password: "", role: "tecnico", discipline: "Mecánico", full_access: false, modulos: [] });
@@ -248,16 +353,7 @@ function NewUser({ onClose, onSave, currentUser }) {
                   </label>
                 )}
               </div>
-              {!f.full_access && (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-                  {availableModulos.map(m => (
-                    <label key={m.k} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, color: f.modulos.includes(m.k) ? "#60a5fa" : "#cbd5e1", fontWeight: 600}}>
-                      <input type="checkbox" checked={f.modulos.includes(m.k)} onChange={() => toggleModulo(m.k)} />
-                      {m.l}
-                    </label>
-                  ))}
-                </div>
-              )}
+              {!f.full_access && <ModulePerms modulos={f.modulos} onChange={v => s("modulos", v)} available={availableModulos} currentUser={currentUser} />}
               {f.full_access && <div style={{ fontSize: 11, color: "#34d399" }}>✅ Este admin tendrá acceso a todos los módulos</div>}
             </div>
           )}
@@ -616,7 +712,7 @@ function OTRow({ ot, equipment, onClick, onDelete }) {
 }
 
 // ── OT DETAIL ────────────────────────────────────────────────
-function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose, onStatusChange }) {
+function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, readOnly, onClose, onStatusChange }) {
   const [params, setParams] = useState([]);
   const [readings, setReadings] = useState([]);
   const [comments, setComments] = useState([]);
@@ -665,6 +761,7 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
 
   // Guarda automáticamente los parámetros ingresados
   const autoSaveParams = async () => {
+    if (readOnly) return;
     const entries = Object.entries(vals).filter(([, v]) => v && v.trim());
     if (entries.length === 0) return;
     for (const [pid, val] of entries) {
@@ -676,6 +773,7 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
 
   // Guarda automáticamente el comentario en borrador
   const autoSaveComment = async () => {
+    if (readOnly) return;
     if (!comment.trim()) return;
     const c = await db.addComment({ ot_id: ot.id, author: user.name, role: user.role === "admin" ? "Administrador" : "Técnico", discipline: user.discipline || ot.discipline, text: comment });
     if (c) setComments(prev => [...prev, c]);
@@ -690,6 +788,7 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
   };
 
   const postComment = async () => {
+    if (readOnly) return;
     if (!comment.trim()) return;
     const c = await db.addComment({ ot_id: ot.id, author: user.name, role: user.role === "admin" ? "Administrador" : "Técnico", discipline: user.discipline || ot.discipline, text: comment });
     if (c) setComments(prev => [...prev, c]);
@@ -697,6 +796,7 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
   };
 
   const changeStatus = async (s) => {
+    if (readOnly) return;
     await db.updateOTStatus(ot.id, s);
     setStatus(s);
     onStatusChange(ot.id, s);
@@ -705,6 +805,7 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
   const TABS = [{ k: "params", l: "📏 Parámetros" }, { k: "comments", l: "💬 Comentarios" }, { k: "info", l: "ℹ️ Info" }, { k: "ji", l: "📖 Procedimiento" }];
 
   const closeAndExport = async () => {
+    if (readOnly) return;
     setSaving(true);
     // 1. Guardar parámetros pendientes
     const entries = Object.entries(vals).filter(([, v]) => v && v.trim());
@@ -792,7 +893,7 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
             <div style={{ fontSize: 11, color: "#cbd5e1", marginTop: 3, fontWeight: 600}}>{ot.id} · {eq?.name}</div>
           </div>
           <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-            {status !== "Cerrada" ? (
+            {readOnly ? null : status !== "Cerrada" ? (
               <button className="btn" onClick={closeAndExport} disabled={saving}
                 style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "6px 14px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
                 {saving ? <><Spinner /> Procesando...</> : "✅ Cerrar OT"}
@@ -831,7 +932,7 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
                 {D_ICON[ot.discipline]} Parámetros {ot.discipline} — {params.length} campos
               </div>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                {isAdmin && readings.length > 0 && (
+                {isAdmin && !readOnly && readings.length > 0 && (
                   <button className="btn" onClick={async () => {
                     if (!window.confirm("¿Eliminar todas las lecturas de esta OT?")) return;
                     await supabase.from("readings").delete().eq("ot_id", ot.id);
@@ -887,6 +988,7 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
                             style={{ padding: "8px 12px", fontSize: 13, background: vals[p.id] ? "#0f2040" : "#07111f", borderColor: vals[p.id] ? "#3b82f6" : "#1a2740" }}
                             placeholder={"Valor en " + p.unit}
                             value={vals[p.id] || ""}
+                            disabled={!!readOnly}
                             onChange={e => setVals(prev => ({ ...prev, [p.id]: e.target.value }))}
                           />
                         </td>
@@ -912,7 +1014,7 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
                       <span style={{ fontSize: 13, fontWeight: 600, color: "#f1f5f9" }}>{c.author || "Técnico"}</span>
                       <span style={{ fontSize: 10, color: "#cbd5e1", fontWeight: 600}}>{c.role || ""}{c.discipline ? " · " + c.discipline : ""}</span>
                       <span style={{ fontSize: 10, color: "#cbd5e1", marginLeft: "auto", fontWeight: 600}}>{c.created_at ? new Date(c.created_at).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" }) : "—"}</span>
-                      {isAdmin && (
+                      {isAdmin && !readOnly && (
                         <button className="btn" onClick={async () => {
                           if (!window.confirm("¿Eliminar este comentario?")) return;
                           await supabase.from("comments").delete().eq("id", c.id);
@@ -925,8 +1027,8 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
                 ))}
               </div>}
             <div style={{ borderTop: "1px solid #14213a", paddingTop: 12 }}>
-              {(!isAdmin && status === "Cerrada") ? (
-                <div style={{ fontSize: 12, color: "#cbd5e1", fontStyle: "italic", padding: "10px 0", fontWeight: 600}}>Esta OT está cerrada. No se pueden agregar más comentarios.</div>
+              {(readOnly || (!isAdmin && status === "Cerrada")) ? (
+                <div style={{ fontSize: 12, color: "#cbd5e1", fontStyle: "italic", padding: "10px 0", fontWeight: 600}}>{readOnly ? "Acceso de solo ver: no puedes agregar comentarios." : "Esta OT está cerrada. No se pueden agregar más comentarios."}</div>
               ) : (
                 <>
                   <textarea className="inp" rows={3} placeholder="Escribe una novedad técnica... (se guarda al cambiar de pestaña o al Cerrar OT)" value={comment} onChange={e => setComment(e.target.value)} style={{ resize: "vertical", marginBottom: 8 }} />
@@ -990,7 +1092,7 @@ function OTDetail({ ot, equipment, locations, jis, users, user, isAdmin, onClose
                 <div style={{ fontSize: 10, color: "#cbd5e1", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6, fontWeight: 600}}>Descripción de Actividad</div>
                 <div style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.6 }}>{infoDesc}</div>
               </div>
-              {isAdmin && (
+              {isAdmin && !readOnly && (
                 <div style={{ background: "#060b14", borderRadius: 8, padding: "12px 14px" }}>
                   <div style={{ fontSize: 11, color: "#cbd5e1", marginBottom: 8, fontWeight: 600}}>Cambiar estado:</div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -1383,7 +1485,7 @@ function ManualReadingForm({ onClose, equipment, onSaved }) {
   );
 }
 
-function DashboardOperativo({ allReadings, equipment, onRefresh }) {
+function DashboardOperativo({ allReadings, equipment, onRefresh, readOnly }) {
   const [filterFecha, setFilterFecha] = useState("");
   const [showManual, setShowManual] = useState(false);
   const [filterTag, setFilterTag] = useState("");
@@ -1512,11 +1614,13 @@ function DashboardOperativo({ allReadings, equipment, onRefresh }) {
 
   return (
     <div className="fd">
-      {showManual && <ManualReadingForm onClose={() => setShowManual(false)} equipment={equipment} onSaved={() => onRefresh && onRefresh()} />}
+      {showManual && !readOnly && <ManualReadingForm onClose={() => setShowManual(false)} equipment={equipment} onSaved={() => onRefresh && onRefresh()} />}
+{!readOnly && (
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
         <button className="btn" onClick={() => setShowManual(true)} style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "8px 18px", fontSize: 13 }}>+ Agregar Lectura</button>
       </div>
-      {/* FILTROS */}
+
+)}      {/* FILTROS */}
       <div className="card" style={{ marginBottom: 18, padding: "14px 18px" }}>
         <div style={{ fontSize: 11, fontWeight: 600, color: "#cbd5e1", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 12 }}>🔽 Filtros</div>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
@@ -1776,12 +1880,14 @@ function DashboardOperativo({ allReadings, equipment, onRefresh }) {
                       <td style={{ color: "#cbd5e1", fontWeight: 600}}>{r.parameters?.unit || "—"}</td>
                       <td style={{ color: "#cbd5e1", fontSize: 11, fontWeight: 600}}>{r.created_at ? new Date(r.created_at).toLocaleDateString("es-CO") : "—"}</td>
                       <td>
+{!readOnly && (
                         <button className="btn" onClick={async () => {
                           if (!window.confirm("¿Eliminar esta lectura?")) return;
                           await supabase.from("readings").delete().eq("id", r.id);
                           if (onRefresh) onRefresh();
                         }} style={{ background: "#3b0f0f", color: "#f87171", padding: "3px 9px", fontSize: 11 }}>🗑️</button>
-                      </td>
+
+)}                      </td>
                     </tr>
                   );
                 })}
@@ -2119,7 +2225,7 @@ function ImportHistorico({ equipment }) {
 const SOLPED_ESTADOS = ["Pendiente", "En Proceso", "Completado", "Cancelado"];
 const SOLPED_PRIORIDADES = ["Alta", "Media", "Baja"];
 
-function SolpedPage() {
+function SolpedPage({ readOnly }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -2171,7 +2277,7 @@ function SolpedPage() {
             XLSX.utils.book_append_sheet(wb, ws, "SOLPED");
             XLSX.writeFile(wb, "solped_repuestos_" + new Date().toLocaleDateString("es-CO").replace(/\//g,"-") + ".xlsx");
           }} style={{ background: "#0f2040", color: "#34d399", padding: "7px 14px", fontSize: 13 }}>📊 Exportar Excel</button>
-          <button className="btn" onClick={() => { setForm(empty); setEditId(null); setShowForm(true); }} style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "7px 16px", fontSize: 13 }}>+ Agregar</button>
+          {!readOnly && <button className="btn" onClick={() => { setForm(empty); setEditId(null); setShowForm(true); }} style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "7px 16px", fontSize: 13 }}>+ Agregar</button>}
         </div>
       </div>
 
@@ -2260,8 +2366,10 @@ function SolpedPage() {
                   <td style={{ color: "#cbd5e1", fontSize: 11, fontWeight: 600}}>{item.fecha_fin}</td>
                   <td>{item.archivo_url ? <a href={item.archivo_url} target="_blank" rel="noreferrer" style={{ color: "#34d399", fontSize: 11 }}>📎 Ver</a> : <span style={{ color: "#cbd5e1", fontSize: 11, fontWeight: 600}}>—</span>}</td>
                   <td style={{ display: "flex", gap: 5 }}>
+                    {!readOnly && <>
                     <button className="btn" onClick={() => { setForm({ tipo: item.tipo, area: item.area, solped: item.solped, actividad: item.actividad, avances: item.avances, prioridad: item.prioridad, avance_pct: item.avance_pct, estado: item.estado, fecha_inicio: item.fecha_inicio || "", fecha_fin: item.fecha_fin || "", archivo_url: item.archivo_url || "" }); setEditId(item.id); setShowForm(true); }} style={{ background: "#0f2040", color: "#60a5fa", padding: "3px 9px", fontSize: 11 }}>✏️</button>
                     <button className="btn" onClick={() => del(item.id)} style={{ background: "#3b0f0f", color: "#f87171", padding: "3px 9px", fontSize: 11 }}>🗑️</button>
+                  </>}
                   </td>
                 </tr>
               ))}
@@ -2274,7 +2382,7 @@ function SolpedPage() {
 }
 
 // ── AVISOS ────────────────────────────────────────────────────
-function AvisosPage() {
+function AvisosPage({ readOnly }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -2326,7 +2434,7 @@ function AvisosPage() {
             XLSX.utils.book_append_sheet(wb, ws, "Avisos");
             XLSX.writeFile(wb, "seguimiento_avisos_" + new Date().toLocaleDateString("es-CO").replace(/\//g,"-") + ".xlsx");
           }} style={{ background: "#0f2040", color: "#34d399", padding: "7px 14px", fontSize: 13 }}>📊 Exportar Excel</button>
-          <button className="btn" onClick={() => { setForm(empty); setEditId(null); setShowForm(true); }} style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "7px 16px", fontSize: 13 }}>+ Agregar</button>
+          {!readOnly && <button className="btn" onClick={() => { setForm(empty); setEditId(null); setShowForm(true); }} style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "7px 16px", fontSize: 13 }}>+ Agregar</button>}
         </div>
       </div>
 
@@ -2411,8 +2519,10 @@ function AvisosPage() {
                   <td style={{ color: "#cbd5e1", fontSize: 11, fontWeight: 600}}>{item.fecha_fin}</td>
                   <td>{item.archivo_url ? <a href={item.archivo_url} target="_blank" rel="noreferrer" style={{ color: "#34d399", fontSize: 11 }}>📎 Ver</a> : <span style={{ color: "#cbd5e1", fontSize: 11, fontWeight: 600}}>—</span>}</td>
                   <td style={{ display: "flex", gap: 5 }}>
+                    {!readOnly && <>
                     <button className="btn" onClick={() => { setForm({ area: item.area, ot_aviso: item.ot_aviso, n_aviso: item.n_aviso, actividad: item.actividad, acciones: item.acciones, prioridad: item.prioridad, avance_pct: item.avance_pct, estado: item.estado, fecha_reporte: item.fecha_reporte || "", fecha_fin: item.fecha_fin || "", archivo_url: item.archivo_url || "" }); setEditId(item.id); setShowForm(true); }} style={{ background: "#0f2040", color: "#60a5fa", padding: "3px 9px", fontSize: 11 }}>✏️</button>
                     <button className="btn" onClick={() => del(item.id)} style={{ background: "#3b0f0f", color: "#f87171", padding: "3px 9px", fontSize: 11 }}>🗑️</button>
+                  </>}
                   </td>
                 </tr>
               ))}
@@ -2425,7 +2535,7 @@ function AvisosPage() {
 }
 
 // ── TALLER PAGE ───────────────────────────────────────────────
-function TallerPage() {
+function TallerPage({ readOnly }) {
   const fileRefT = useRef();
   const empty = { tipo_bomba: "", propiedad: "", ubicacion_actual: "", serie: "", tag: "", avance_inspeccion: 0, avance_reparacion: 0, comentario: "", fecha_inicio_inspeccion: "", fecha_final_inspeccion: "", fecha_inicio_mantto: "", fecha_final_mantto: "", fecha_salida: "", responsable_salida: "", condicion: "", archivo_url: "" };
   const [items, setItems] = useState([]);
@@ -2488,7 +2598,7 @@ function TallerPage() {
         <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 700, fontSize: 15, color: "#f1f5f9" }}>🔩 Seguimiento de Mantenimiento en Taller</div>
         <div style={{ display: "flex", gap: 8 }}>
           <button className="btn" onClick={exportExcel} style={{ background: "#0f2040", color: "#34d399", padding: "7px 14px", fontSize: 13 }}>📊 Exportar Excel</button>
-          <button className="btn" onClick={() => { setForm(empty); setEditId(null); setShowForm(true); }} style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "7px 16px", fontSize: 13 }}>+ Agregar</button>
+          {!readOnly && <button className="btn" onClick={() => { setForm(empty); setEditId(null); setShowForm(true); }} style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "7px 16px", fontSize: 13 }}>+ Agregar</button>}
         </div>
       </div>
 
@@ -2593,8 +2703,10 @@ function TallerPage() {
                   <td style={{ color: "#94a3b8" }}>{item.condicion}</td>
                   <td>{item.archivo_url ? <a href={item.archivo_url} target="_blank" rel="noreferrer" style={{ color: "#34d399", fontSize: 11 }}>📎 Ver</a> : <span style={{ color: "#cbd5e1", fontSize: 11, fontWeight: 600}}>—</span>}</td>
                   <td style={{ display: "flex", gap: 5 }}>
+                    {!readOnly && <>
                     <button className="btn" onClick={() => { setForm({ tipo_bomba: item.tipo_bomba||"", propiedad: item.propiedad||"", ubicacion_actual: item.ubicacion_actual||"", serie: item.serie||"", tag: item.tag||"", avance_inspeccion: item.avance_inspeccion||0, avance_reparacion: item.avance_reparacion||0, comentario: item.comentario||"", fecha_inicio_inspeccion: item.fecha_inicio_inspeccion||"", fecha_final_inspeccion: item.fecha_final_inspeccion||"", fecha_inicio_mantto: item.fecha_inicio_mantto||"", fecha_final_mantto: item.fecha_final_mantto||"", fecha_salida: item.fecha_salida||"", responsable_salida: item.responsable_salida||"", condicion: item.condicion||"", archivo_url: item.archivo_url||"" }); setEditId(item.id); setShowForm(true); }} style={{ background: "#0f2040", color: "#60a5fa", padding: "3px 9px", fontSize: 11 }}>✏️</button>
                     <button className="btn" onClick={() => del(item.id)} style={{ background: "#3b0f0f", color: "#f87171", padding: "3px 9px", fontSize: 11 }}>🗑️</button>
+                  </>}
                   </td>
                 </tr>
               ))}
@@ -2928,6 +3040,22 @@ function MegadoHistorialPage({ equipment, canDelete }) {
   );
 }
 
+// ── VERIFICACIÓN: utilidades de filtro ───────────────────────
+const localDay = (iso) => {
+  const d = new Date(iso);
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+};
+// TAG y áreas de una lectura: primero el equipo de la OT; si no hay, lo que trae la descripción ("TAG|ÁREA|SUBÁREA|...")
+const verifInfo = (r, eqById, eqByCode) => {
+  const wo = r.work_orders || {};
+  const parts = (wo.description || "").split("|");
+  const descTag = (parts[0] || "").trim().toUpperCase();
+  const eq = (wo.equipment_id != null ? eqById.get(wo.equipment_id) : null) || eqByCode.get(descTag);
+  const tag = ((eq && eq.code) || descTag || "").trim().toUpperCase();
+  const areas = [...new Set([eq && eq.area, parts[1]].map(x => (x || "").trim()).filter(Boolean))];
+  return { tag, areas };
+};
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [locations, setLocations] = useState([]);
@@ -2945,8 +3073,47 @@ export default function App() {
   const [filterOTStatus, setFilterOTStatus] = useState("");
   const [selectedVerif, setSelectedVerif] = useState(new Set());
   const [selectedOTs, setSelectedOTs] = useState(new Set());
+  const [editingUser, setEditingUser] = useState(null);
+  // Verificación: filtros y edición
+  const [vDesde, setVDesde] = useState("");
+  const [vHasta, setVHasta] = useState("");
+  const [vArea, setVArea] = useState("");
+  const [vTag, setVTag] = useState("");
+  const [vLimit, setVLimit] = useState(50);
+  const [editRid, setEditRid] = useState(null);
+  const [editVal, setEditVal] = useState("");
+  const [editFechaOt, setEditFechaOt] = useState(null);
+  const verifEqById = useMemo(() => { const m = new Map(); equipment.forEach(e => m.set(e.id, e)); return m; }, [equipment]);
+  const verifEqByCode = useMemo(() => { const m = new Map(); equipment.forEach(e => { if (e.code) m.set(e.code.trim().toUpperCase(), e); }); return m; }, [equipment]);
+  const verifCatalog = useMemo(() => {
+    const seen = new Map();
+    allReadings.forEach(r => {
+      const { tag, areas } = verifInfo(r, verifEqById, verifEqByCode);
+      if (!tag) return;
+      (areas.length ? areas : [""]).forEach(ar => {
+        const k = tag + "|" + ar.toUpperCase();
+        if (!seen.has(k)) seen.set(k, { tag, area: ar });
+      });
+    });
+    return [...seen.values()];
+  }, [allReadings, verifEqById, verifEqByCode]);
+  const verifFiltered = useMemo(() => allReadings.filter(r => {
+    if (vDesde || vHasta) {
+      if (!r.created_at) return false;
+      const d = localDay(r.created_at);
+      if (vDesde && d < vDesde) return false;
+      if (vHasta && d > vHasta) return false;
+    }
+    if (vTag || vArea) {
+      const { tag, areas } = verifInfo(r, verifEqById, verifEqByCode);
+      if (vTag && tag !== vTag) return false;
+      if (vArea && !areas.some(x => x.toUpperCase() === vArea.trim().toUpperCase())) return false;
+    }
+    return true;
+  }), [allReadings, vDesde, vHasta, vTag, vArea, verifEqById, verifEqByCode]);
 
   const isAdmin = user?.role === "admin";
+  const ro = (k) => isRO(user, k); // administrador con "Solo ver" en el módulo k
   const myOTsAll = isAdmin ? ots : ots; // techs see all OTs of their discipline (filtered at DB level)
   const myOTs = myOTsAll
     .filter(o => !filterOTDisc || o.discipline === filterOTDisc)
@@ -3061,14 +3228,14 @@ export default function App() {
         <div style={{ background: "#070e1b", borderBottom: "1px solid #111c30", padding: "12px 22px", display: "flex", alignItems: "center", gap: 10, position: "sticky", top: 0, zIndex: 10 }}>
           <div style={{ flex: 1, fontFamily: "Syne,sans-serif", fontSize: 16, fontWeight: 700, color: "#f1f5f9" }}>{curNav?.i} {curNav?.l}</div>
           {loading && <Spinner />}
-          {isAdmin && page === "ots" && <>
+          {isAdmin && page === "ots" && !ro("ots") && <>
             <button className="btn" onClick={() => setModal("importExcel")} style={{ background: "#0f2040", color: "#34d399", padding: "7px 14px", fontSize: 13 }}>📥 Importar Excel</button>
             <button className="btn" onClick={() => setModal("newOT")} style={{ background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", color: "#fff", padding: "7px 16px", fontSize: 13 }}>+ Nueva OT</button>
           </>}
-          {isAdmin && page === "equipment" && <button className="btn" onClick={() => setModal("newEquip")} style={{ background: "#0f2040", color: "#60a5fa", padding: "7px 14px", fontSize: 13 }}>+ Equipo</button>}
+          {isAdmin && page === "equipment" && !ro("equipment") && <button className="btn" onClick={() => setModal("newEquip")} style={{ background: "#0f2040", color: "#60a5fa", padding: "7px 14px", fontSize: 13 }}>+ Equipo</button>}
           {isAdmin && page === "locations" && <button className="btn" onClick={() => setModal("newLoc")} style={{ background: "#0f2040", color: "#60a5fa", padding: "7px 14px", fontSize: 13 }}>+ Ubicación</button>}
-          {isAdmin && page === "ji" && <button className="btn" onClick={() => setModal("newJI")} style={{ background: "#0f2040", color: "#60a5fa", padding: "7px 14px", fontSize: 13 }}>+ Instrucción</button>}
-          {isAdmin && page === "users" && <button className="btn" onClick={() => setModal("newUser")} style={{ background: "#0f2040", color: "#60a5fa", padding: "7px 14px", fontSize: 13 }}>+ Usuario</button>}
+          {isAdmin && page === "ji" && !ro("ji") && <button className="btn" onClick={() => setModal("newJI")} style={{ background: "#0f2040", color: "#60a5fa", padding: "7px 14px", fontSize: 13 }}>+ Instrucción</button>}
+          {isAdmin && page === "users" && !ro("users") && <button className="btn" onClick={() => setModal("newUser")} style={{ background: "#0f2040", color: "#60a5fa", padding: "7px 14px", fontSize: 13 }}>+ Usuario</button>}
           {!isAdmin && <button className="btn" onClick={() => setModal("searchOT")} style={{ background: "linear-gradient(135deg,#065f46,#0f766e)", color: "#34d399", padding: "7px 16px", fontSize: 13 }}>🔍 Buscar OT</button>}
         </div>
 
@@ -3115,7 +3282,7 @@ export default function App() {
                     <span style={{ fontSize: 11, color: "#cbd5e1", fontWeight: 600}}>{myOTs.length} de {myOTsAll.length} OTs</span>
                   </>
                 )}
-                {isAdmin && myOTs.length > 0 && (
+                {isAdmin && !ro("ots") && myOTs.length > 0 && (
                   <>
                     <button className="btn" onClick={() => {
                       if (selectedOTs.size === myOTs.length) setSelectedOTs(new Set());
@@ -3143,7 +3310,7 @@ export default function App() {
               {myOTs.length === 0 ? <div style={{ textAlign: "center", color: "#cbd5e1", padding: 40, fontWeight: 600}}>No hay órdenes. {isAdmin && "Crea la primera con '+ Nueva OT'."}</div>
                 : myOTs.map(ot => (
                   <div key={ot.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    {isAdmin && (
+                    {isAdmin && !ro("ots") && (
                       <input type="checkbox" checked={selectedOTs.has(ot.id)}
                         onChange={e => {
                           const next = new Set(selectedOTs);
@@ -3156,7 +3323,7 @@ export default function App() {
                     <div style={{ flex: 1 }}>
                       <OTRow ot={ot} equipment={equipment}
                         onClick={() => { setSelOT(ot); setModal("otDetail"); }}
-                        onDelete={isAdmin ? async (id) => {
+                        onDelete={isAdmin && !ro("ots") ? async (id) => {
                           if (!window.confirm("¿Eliminar OT " + id + "?")) return;
                           await db.deleteOT(id);
                           setOts(prev => prev.filter(o => o.id !== id));
@@ -3173,11 +3340,13 @@ export default function App() {
 
           {page === "equipment" && isAdmin && (
             <div className="fd">
+{!ro("equipment") && (
               <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
                 <button className="btn" onClick={() => setModal("importEquip")} style={{ background: "#0f2040", color: "#34d399", padding: "7px 14px", fontSize: 13 }}>📥 Importar Excel</button>
                 <button className="btn" onClick={() => setModal("newEquip")} style={{ background: "#0f2040", color: "#60a5fa", padding: "7px 14px", fontSize: 13 }}>+ Nuevo Equipo</button>
               </div>
-              <div style={{ overflowX: "auto" }}>
+
+)}              <div style={{ overflowX: "auto" }}>
                 <table className="ptable">
                   <thead><tr>{["TAG / Código","Tipo","Área","Sub-área","Acciones"].map(h => <th key={h}>{h}</th>)}</tr></thead>
                   <tbody>
@@ -3188,6 +3357,7 @@ export default function App() {
                         <td style={{ color: "#94a3b8" }}>{eq.area || "—"}</td>
                         <td style={{ color: "#94a3b8" }}>{eq.subarea || "—"}</td>
                         <td style={{ display: "flex", gap: 6 }}>
+                          {!ro("equipment") && <>
                           <button className="btn" onClick={() => { setSelOT({ ...eq, _editEquip: true }); setModal("editEquip"); }}
                             style={{ background: "#0f2040", color: "#60a5fa", padding: "3px 10px", fontSize: 11 }}>✏️ Editar</button>
                           <button className="btn" onClick={async () => {
@@ -3195,6 +3365,7 @@ export default function App() {
                             await supabase.from("equipment").delete().eq("id", eq.id);
                             setEquipment(prev => prev.filter(e => e.id !== eq.id));
                           }} style={{ background: "#3b0f0f", color: "#f87171", padding: "3px 10px", fontSize: 11 }}>🗑️</button>
+                          </>}
                         </td>
                       </tr>
                     ))}
@@ -3268,22 +3439,50 @@ export default function App() {
             </div>
           )}
 
-          {page === "dashboard_op" && isAdmin && <DashboardOperativo allReadings={allReadings} equipment={equipment} onRefresh={() => db.getAllReadings().then(setAllReadings)} />}
-          {page === "historico" && isAdmin && <ImportHistorico equipment={equipment} />}
-          {page === "solped" && isAdmin && <SolpedPage />}
-          {page === "avisos" && isAdmin && <AvisosPage />}
-          {page === "taller" && isAdmin && <TallerPage />}
-          {page === "megado" && isAdmin && <MegadoPage equipment={equipment} />}
+          {page === "dashboard_op" && isAdmin && <DashboardOperativo readOnly={ro("dashboard_op")} allReadings={allReadings} equipment={equipment} onRefresh={() => db.getAllReadings().then(setAllReadings)} />}
+          {page === "historico" && isAdmin && (ro("historico") ? <ReadOnlyNotice /> : <ImportHistorico equipment={equipment} />)}
+          {page === "solped" && isAdmin && <SolpedPage readOnly={ro("solped")} />}
+          {page === "avisos" && isAdmin && <AvisosPage readOnly={ro("avisos")} />}
+          {page === "taller" && isAdmin && <TallerPage readOnly={ro("taller")} />}
+          {page === "megado" && isAdmin && (ro("megado") ? <ReadOnlyNotice /> : <MegadoPage equipment={equipment} />)}
           {page === "megado_hist" && isAdmin && <MegadoHistorialPage equipment={equipment} canDelete={!!user.full_access} />}
 
           {page === "verificacion" && isAdmin && (() => {
-            // Group readings by OT
+            // Group readings by OT (solo las lecturas que pasan los filtros)
             const grouped = {};
-            allReadings.forEach(r => {
-              if (!grouped[r.ot_id]) grouped[r.ot_id] = { disc: r.work_orders?.discipline || "", title: r.work_orders?.title || r.ot_id, status: r.work_orders?.status || "", readings: [] };
+            verifFiltered.forEach(r => {
+              if (!grouped[r.ot_id]) grouped[r.ot_id] = { disc: r.work_orders?.discipline || "", title: r.work_orders?.title || r.ot_id, status: r.work_orders?.status || "", desc: r.work_orders?.description || "", readings: [] };
               grouped[r.ot_id].readings.push(r);
             });
             const otList = Object.entries(grouped);
+            const hasV = !!(vDesde || vHasta || vArea || vTag);
+            const roV = ro("verificacion");
+            const vAreas = (() => { const m = new Map(); verifCatalog.forEach(c => { const t = c.area.trim(); if (t && !m.has(t.toUpperCase())) m.set(t.toUpperCase(), t); }); return [...m.values()].sort(); })();
+            const vTags = [...new Set(verifCatalog.filter(c => !vArea || c.area.trim().toUpperCase() === vArea.trim().toUpperCase()).map(c => c.tag))].sort();
+
+            // Corregir el valor de UNA lectura: se actualiza la misma fila (no se crea otra) y el Dashboard Operativo se actualiza al instante
+            const saveEdit = async (r) => {
+              if (roV) return;
+              const v = String(editVal).trim().replace(",", ".");
+              if (v === "" || isNaN(parseFloat(v)) || !isFinite(Number(v))) { alert("Ingresa un valor numérico."); return; }
+              const { error } = await supabase.from("readings").update({ value: v }).eq("id", r.id);
+              if (error) { console.error("Error al corregir lectura:", error); alert("No se pudo guardar: " + error.message); return; }
+              setAllReadings(prev => prev.map(x => x.id === r.id ? { ...x, value: v } : x));
+              setEditRid(null);
+            };
+            // Corregir la fecha de todas las lecturas de una OT (misma fila, no se duplica nada)
+            const saveFechaOt = async (otId, g) => {
+              if (roV) return;
+              const fecha = editFechaOt && editFechaOt.fecha;
+              if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha || "")) { alert("Selecciona una fecha válida."); return; }
+              if (!window.confirm("Se cambiará la fecha de " + g.readings.length + " lecturas de la OT " + otId + " a " + fecha.split("-").reverse().join("/") + ". ¿Continuar?")) return;
+              const iso = fecha + "T12:00:00";
+              const { error } = await supabase.from("readings").update({ created_at: iso }).eq("ot_id", otId);
+              if (error) { console.error("Error al corregir fecha:", error); alert("No se pudo actualizar la fecha: " + error.message); return; }
+              if ((g.desc || "").endsWith("Histórico")) await supabase.from("work_orders").update({ created_at: iso }).eq("id", otId);
+              setAllReadings(prev => prev.map(x => x.ot_id === otId ? { ...x, created_at: iso } : x));
+              setEditFechaOt(null);
+            };
 
             const downloadOTPDF = async (otId, g) => {
               // Fetch comments for this OT from Supabase
@@ -3331,7 +3530,7 @@ export default function App() {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
                   <div>
                     <div style={{ fontFamily: "Syne,sans-serif", fontSize: 15, fontWeight: 700, color: "#f1f5f9" }}>Verificación de Información Ingresada</div>
-                    <div style={{ fontSize: 12, color: "#cbd5e1", marginTop: 3, fontWeight: 600}}>{otList.length} OTs con lecturas · {allReadings.length} lecturas totales</div>
+                    <div style={{ fontSize: 12, color: "#cbd5e1", marginTop: 3, fontWeight: 600}}>{otList.length} OTs con lecturas · {verifFiltered.length} lecturas{hasV ? " (de " + allReadings.length + ")" : " totales"}</div>
                   </div>
                   <button className="btn" onClick={async () => {
                     const XLSX = window.XLSX;
@@ -3415,13 +3614,15 @@ export default function App() {
                   }} style={{ background: "#0f2040", color: "#60a5fa", padding: "8px 14px", fontSize: 13 }}>
                     📊 Exportar Todo a Excel
                   </button>
+{!roV && (
                   <button className="btn" onClick={() => {
                     if (selectedVerif.size === otList.length) setSelectedVerif(new Set());
                     else setSelectedVerif(new Set(otList.map(([id]) => id)));
                   }} style={{ background: "#111c30", color: "#60a5fa", padding: "8px 14px", fontSize: 13 }}>
                     {selectedVerif.size === otList.length ? "☐ Deseleccionar todo" : "☑ Seleccionar todo"}
                   </button>
-                  {selectedVerif.size > 0 && (
+)}
+                  {!roV && selectedVerif.size > 0 && (
                     <button className="btn" onClick={async () => {
                       if (!window.confirm("¿Eliminar lecturas de " + selectedVerif.size + " OTs seleccionadas?")) return;
                       for (const otId of selectedVerif) {
@@ -3436,12 +3637,40 @@ export default function App() {
                   )}
                 </div>
 
+                {/* FILTROS */}
+                <div className="card" style={{ marginBottom: 14, padding: "14px 18px" }}>
+                  <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
+                    <div style={{ flex: 1, minWidth: 150 }}><Lbl l="Fecha desde"><input className="inp" type="date" value={vDesde} onChange={e => { setVDesde(e.target.value); setVLimit(50); }} /></Lbl></div>
+                    <div style={{ flex: 1, minWidth: 150 }}><Lbl l="Fecha hasta"><input className="inp" type="date" value={vHasta} onChange={e => { setVHasta(e.target.value); setVLimit(50); }} /></Lbl></div>
+                    <div style={{ flex: 1, minWidth: 160 }}>
+                      <Lbl l="Área">
+                        <select className="inp" value={vArea} onChange={e => { setVArea(e.target.value); setVTag(""); setVLimit(50); }}>
+                          <option value="">Todas las áreas</option>
+                          {vAreas.map(x => <option key={x} value={x}>{x}</option>)}
+                        </select>
+                      </Lbl>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 160 }}>
+                      <Lbl l="TAG / Equipo">
+                        <select className="inp" value={vTag} onChange={e => { setVTag(e.target.value); setVLimit(50); }}>
+                          <option value="">Todos los TAGs</option>
+                          {vTags.map(x => <option key={x} value={x}>{x}</option>)}
+                        </select>
+                      </Lbl>
+                    </div>
+                    {hasV && (
+                      <button className="btn" onClick={() => { setVDesde(""); setVHasta(""); setVArea(""); setVTag(""); setVLimit(50); }} style={{ background: "#3b0f0f", color: "#f87171", padding: "8px 14px", fontSize: 12 }}>✕ Limpiar filtros</button>
+                    )}
+                  </div>
+                </div>
+
                 {otList.length === 0 ? (
-                  <div style={{ textAlign: "center", color: "#cbd5e1", padding: 40, fontWeight: 600}}>No hay lecturas registradas aún. Los técnicos deben cerrar sus OTs para que aparezcan aquí.</div>
-                ) : otList.map(([otId, g]) => (
+                  <div style={{ textAlign: "center", color: "#cbd5e1", padding: 40, fontWeight: 600}}>{hasV ? "No hay lecturas con estos filtros." : "No hay lecturas registradas aún. Los técnicos deben cerrar sus OTs para que aparezcan aquí."}</div>
+                ) : otList.slice(0, vLimit).map(([otId, g]) => (
                   <div key={otId} className="card" style={{ marginBottom: 14 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
                       <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+{!roV && (
                       <input type="checkbox" checked={selectedVerif.has(otId)}
                         onChange={e => {
                           const next = new Set(selectedVerif);
@@ -3450,6 +3679,7 @@ export default function App() {
                         }}
                         style={{ width: 16, height: 16, cursor: "pointer", marginTop: 4, accentColor: "#3b82f6" }}
                       />
+)}
                       <div>
                         <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4 }}>
                           <span style={{ fontFamily: "Syne,sans-serif", fontSize: 12, color: "#3b82f6", fontWeight: 700 }}>{otId}</span>
@@ -3461,10 +3691,17 @@ export default function App() {
                       </div>
                       </div>
                       <div style={{ display: "flex", gap: 8 }}>
+{!roV && (
+                        <button className="btn" onClick={() => setEditFechaOt({ otId, fecha: g.readings[0]?.created_at ? localDay(g.readings[0].created_at) : "" })}
+                          style={{ background: "#0f2040", color: "#60a5fa", padding: "7px 12px", fontSize: 12 }}>
+                          📅 Fecha
+                        </button>
+)}
                         <button className="btn" onClick={() => downloadOTPDF(otId, g)}
                           style={{ background: "linear-gradient(135deg,#065f46,#0f766e)", color: "#34d399", padding: "7px 14px", fontSize: 12 }}>
                           📄 PDF
                         </button>
+{!roV && (
                         <button className="btn" onClick={async () => {
                           if (!window.confirm("¿Eliminar todas las lecturas de la OT " + otId + "?")) return;
                           await supabase.from("readings").delete().eq("ot_id", otId);
@@ -3473,18 +3710,43 @@ export default function App() {
                         }} style={{ background: "#3b0f0f", color: "#f87171", padding: "7px 12px", fontSize: 12 }}>
                           🗑️ Eliminar
                         </button>
+)}
                       </div>
                     </div>
+                    {editFechaOt && editFechaOt.otId === otId && (
+                      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", margin: "0 0 12px", padding: "10px 12px", background: "#0d1b2e", border: "1px solid #1e3a5f", borderRadius: 8 }}>
+                        <span style={{ fontSize: 12, color: "#cbd5e1", fontWeight: 600 }}>Nueva fecha para las {g.readings.length} lecturas de esta OT:</span>
+                        <input className="inp" type="date" style={{ width: 160, padding: "6px 10px", fontSize: 12 }} value={editFechaOt.fecha} onChange={e => setEditFechaOt({ otId, fecha: e.target.value })} />
+                        <button className="btn" onClick={() => saveFechaOt(otId, g)} style={{ background: "linear-gradient(135deg,#065f46,#0f766e)", color: "#34d399", padding: "6px 14px", fontSize: 12 }}>Guardar</button>
+                        <button className="btn" onClick={() => setEditFechaOt(null)} style={{ background: "#111c30", color: "#cbd5e1", padding: "6px 12px", fontSize: 12, fontWeight: 600 }}>Cancelar</button>
+                      </div>
+                    )}
                     <div style={{ overflowX: "auto" }}>
                       <table className="ptable">
-                        <thead><tr>{["Parámetro","Unidad","Valor","Fecha"].map(h => <th key={h}>{h}</th>)}</tr></thead>
+                        <thead><tr>{["Parámetro","Unidad","Valor","Fecha",""].map((h, hi) => <th key={hi}>{h}</th>)}</tr></thead>
                         <tbody>
                           {g.readings.map((r, i) => (
-                            <tr key={i}>
+                            <tr key={r.id || i}>
                               <td style={{ color: "#cbd5e1", fontWeight: 500 }}>{r.parameters?.name || "—"}</td>
                               <td style={{ color: "#cbd5e1", fontWeight: 600}}>{r.parameters?.unit || "—"}</td>
-                              <td style={{ color: "#34d399", fontWeight: 700 }}>{r.value}</td>
+                              <td style={{ color: "#34d399", fontWeight: 700 }}>
+                                {editRid === r.id ? (
+                                  <input className="inp" style={{ padding: "4px 8px", fontSize: 12, width: 100 }} value={editVal} autoFocus
+                                    onChange={e => setEditVal(e.target.value)}
+                                    onKeyDown={e => { if (e.key === "Enter") saveEdit(r); if (e.key === "Escape") setEditRid(null); }} />
+                                ) : r.value}
+                              </td>
                               <td style={{ color: "#cbd5e1", fontSize: 11, fontWeight: 600}}>{r.created_at ? new Date(r.created_at).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" }) : "—"}</td>
+                              <td style={{ whiteSpace: "nowrap" }}>
+                                {editRid === r.id ? (
+                                  <>
+                                    <button className="btn" onClick={() => saveEdit(r)} style={{ background: "#0f2a1e", color: "#34d399", padding: "3px 9px", fontSize: 12, marginRight: 4 }}>✓</button>
+                                    <button className="btn" onClick={() => setEditRid(null)} style={{ background: "#111c30", color: "#cbd5e1", padding: "3px 9px", fontSize: 12 }}>✕</button>
+                                  </>
+                                ) : roV ? null : (
+                                  <button className="btn" onClick={() => { setEditRid(r.id); setEditVal(String(r.value)); }} style={{ background: "#0f2040", color: "#60a5fa", padding: "3px 9px", fontSize: 12 }}>✏️</button>
+                                )}
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -3492,6 +3754,12 @@ export default function App() {
                     </div>
                   </div>
                 ))}
+                {otList.length > vLimit && (
+                  <div style={{ textAlign: "center", marginTop: 8, fontSize: 12, color: "#cbd5e1", fontWeight: 600 }}>
+                    Mostrando {vLimit} de {otList.length} OTs ·{" "}
+                    <button className="btn" onClick={() => setVLimit(n => n + 50)} style={{ background: "#0f2040", color: "#60a5fa", padding: "5px 12px", fontSize: 12 }}>Mostrar 50 más</button>
+                  </div>
+                )}
               </div>
             );
           })()}
@@ -3500,7 +3768,10 @@ export default function App() {
             <div className="fd" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))", gap: 12 }}>
               {users.map(u => (
                 <div key={u.id} className="card" style={{ position: "relative" }}>
-                  {u.id !== user.id && (
+                  {user.full_access && u.id !== user.id && (
+                    <button className="btn" title="Editar acceso" onClick={() => { setEditingUser(u); setModal("editUser"); }} style={{ position: "absolute", top: 10, right: 44, background: "#0f2040", color: "#60a5fa", padding: "3px 8px", fontSize: 11, borderRadius: 5 }}>✏️</button>
+                  )}
+                  {u.id !== user.id && !ro("users") && (
                     <button className="btn" onClick={async () => {
                       if (!window.confirm("¿Eliminar usuario " + u.name + "?")) return;
                       const { error } = await supabase.from("users").delete().eq("id", u.id);
@@ -3520,7 +3791,7 @@ export default function App() {
                       <div style={{ fontSize: 10, color: "#cbd5e1", lineHeight: 1.5, fontWeight: 600}}>
                         {(u.modulos || []).map(m => {
                           const mod = ALL_MODULOS.find(x => x.k === m);
-                          return mod ? <span key={m} style={{ display: "inline-block", background: "#0d1b2e", color: "#60a5fa", borderRadius: 4, padding: "1px 6px", marginRight: 3, marginBottom: 2 }}>{mod.l}</span> : null;
+                          return mod ? <span key={m} style={{ display: "inline-block", background: "#0d1b2e", color: "#60a5fa", borderRadius: 4, padding: "1px 6px", marginRight: 3, marginBottom: 2 }}>{mod.l}{(u.modulos || []).includes("ro:" + m) ? " 👁" : ""}</span> : null;
                         })}
                       </div>
                     )}
@@ -3533,7 +3804,7 @@ export default function App() {
       </div>
 
       {modal === "otDetail" && selOT && (
-        <OTDetail ot={selOT} equipment={equipment} locations={locations} jis={jis} users={users} user={user} isAdmin={isAdmin}
+        <OTDetail ot={selOT} equipment={equipment} locations={locations} jis={jis} users={users} user={user} isAdmin={isAdmin} readOnly={ro("ots")}
           onClose={closeModal}
           onStatusChange={async (id, status) => {
             setOts(prev => prev.map(o => o.id === id ? { ...o, status } : o));
@@ -3546,6 +3817,7 @@ export default function App() {
       {modal === "newEquip" && <NewEquip locations={locations} onClose={closeModal} onSave={eq => { setEquipment(p => [...p, eq]); closeModal(); }} />}
       {modal === "newLoc" && <NewLoc onClose={closeModal} onSave={loc => { setLocations(p => [...p, loc]); closeModal(); }} />}
       {modal === "newJI" && <NewJI onClose={closeModal} onSave={ji => { setJis(p => [...p, ji]); closeModal(); }} />}
+      {modal === "editUser" && editingUser && <EditUserAccess u={editingUser} currentUser={user} onClose={closeModal} onSave={upd => { setUsers(p => p.map(x => x.id === upd.id ? { ...x, ...upd } : x)); closeModal(); }} />}
       {modal === "newUser" && <NewUser onClose={closeModal} currentUser={user} onSave={u => { setUsers(p => [...p, u]); closeModal(); }} />}
       {modal === "importExcel" && <ExcelImport onClose={closeModal} onImported={async () => { const data = await db.getOTs(user.id, isAdmin, user.discipline); setOts(data); }} />}
       {modal === "importEquip" && <ImportEquip onClose={closeModal} onSave={eq => setEquipment(p => [...p, eq])} />}
